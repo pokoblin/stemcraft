@@ -1,8 +1,9 @@
-//! htdemucs_6s weights: cached in `~/Library/Caches/demucs-rs/` (shared with the
-//! demucs-rs CLI), downloaded from Hugging Face on first use.
+//! htdemucs_6s weights: shipped inside the macOS app bundle, otherwise cached in
+//! `~/Library/Caches/demucs-rs/` (shared with the demucs-rs CLI) and downloaded
+//! from Hugging Face on first use.
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use demucs_core::model::metadata::{download_url, ModelInfo, HTDEMUCS_6S};
@@ -14,17 +15,35 @@ pub fn cache_path() -> Result<PathBuf> {
     Ok(base.join("demucs-rs").join(MODEL.filename))
 }
 
-pub fn is_cached() -> bool {
-    cache_path().is_ok_and(|p| p.is_file())
+/// `<App>.app/Contents/Resources/<model>` for an executable in `Contents/MacOS/`.
+fn bundled_path_for(exe: &Path) -> Option<PathBuf> {
+    Some(exe.parent()?.parent()?.join("Resources").join(MODEL.filename))
 }
 
-/// Load the cached weights, downloading them first if needed.
+/// Weights already on disk: the app bundle's copy first, then the download cache.
+fn find_local(exe: Option<&Path>, cache: &Path) -> Option<PathBuf> {
+    exe.and_then(bundled_path_for)
+        .filter(|p| p.is_file())
+        .or_else(|| cache.is_file().then(|| cache.to_path_buf()))
+}
+
+fn local_path() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok();
+    find_local(exe.as_deref(), &cache_path().ok()?)
+}
+
+/// True when no download is needed (bundled or cached).
+pub fn is_cached() -> bool {
+    local_path().is_some()
+}
+
+/// Load the weights, downloading them into the cache first if needed.
 /// `on_download(received_bytes, total_bytes)` reports download progress.
 pub fn load(mut on_download: impl FnMut(u64, Option<u64>)) -> Result<Vec<u8>> {
-    let path = cache_path()?;
-    if path.is_file() {
+    if let Some(path) = local_path() {
         return std::fs::read(&path).with_context(|| format!("cannot read {}", path.display()));
     }
+    let path = cache_path()?;
 
     let url = download_url(MODEL);
     let response = ureq::get(&url)
@@ -61,4 +80,41 @@ pub fn load(mut on_download: impl FnMut(u64, Option<u64>)) -> Result<Vec<u8>> {
         .with_context(|| format!("cannot write {}", partial.display()))?;
     std::fs::rename(&partial, &path)?;
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn bundled_path_is_in_app_resources() {
+        let exe = Path::new("/Applications/Stemcraft.app/Contents/MacOS/stemcraft-app");
+        assert_eq!(
+            bundled_path_for(exe).unwrap(),
+            Path::new("/Applications/Stemcraft.app/Contents/Resources").join(MODEL.filename)
+        );
+    }
+
+    #[test]
+    fn find_local_prefers_bundle_then_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let macos = dir.path().join("X.app/Contents/MacOS");
+        let resources = dir.path().join("X.app/Contents/Resources");
+        std::fs::create_dir_all(&macos).unwrap();
+        std::fs::create_dir_all(&resources).unwrap();
+        let exe = macos.join("stemcraft-app");
+        let cache = dir.path().join("cache.safetensors");
+
+        assert_eq!(find_local(Some(&exe), &cache), None);
+
+        std::fs::write(&cache, b"cached").unwrap();
+        assert_eq!(find_local(Some(&exe), &cache), Some(cache.clone()));
+
+        let bundled = resources.join(MODEL.filename);
+        std::fs::write(&bundled, b"bundled").unwrap();
+        assert_eq!(find_local(Some(&exe), &cache), Some(bundled));
+
+        assert_eq!(find_local(None, &cache), Some(cache));
+    }
 }
