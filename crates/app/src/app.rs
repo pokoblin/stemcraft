@@ -7,18 +7,22 @@ use std::rc::Rc;
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
+use gpui_kit::component::dialog::DialogButtonProps;
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::Notification;
+use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Root, Theme, WindowExt as _};
 use gpui_kit::*;
 use stemcraft_core::audio::StereoAudio;
+use stemcraft_core::chords::Chord;
+use stemcraft_core::separation::Separator;
 
 use crate::controls::MixControls;
 use crate::i18n::t;
 use crate::naming;
 use crate::player::Player;
 use crate::timeline::{self, SelectionError};
-use crate::worker::{self, Decoded};
+use crate::worker::{self, Decoded, SepMsg, Separated, Step};
 
 actions!(stemcraft, [TogglePlay]);
 
@@ -36,6 +40,8 @@ pub fn bind_keys(cx: &mut App) {
 pub enum Stage {
     Empty(EmptyState),
     Trim(TrimState),
+    Processing(ProcessingState),
+    Mixer(MixerState),
 }
 
 #[derive(Default)]
@@ -62,6 +68,37 @@ pub struct TrimState {
 impl TrimState {
     pub fn duration(&self) -> f64 {
         self.source[0].duration_secs()
+    }
+}
+
+pub struct ProcessingState {
+    pub path: PathBuf,
+    pub song: String,
+    /// The trimmed audio, kept for retries.
+    pub audio: Arc<StereoAudio>,
+    pub warmup: bool,
+    pub step: Step,
+    pub progress: f32,
+    pub error: Option<String>,
+    pub rx: Option<mpsc::Receiver<SepMsg>>,
+}
+
+pub struct MixerState {
+    pub path: PathBuf,
+    pub song: String,
+    /// In `worker::STEM_IDS` order, like every per-track vector here.
+    pub stems: Arc<Vec<StereoAudio>>,
+    pub peaks: Vec<Arc<[(f32, f32)]>>,
+    pub chords: Arc<Vec<Chord>>,
+    pub controls: Arc<MixControls>,
+    pub player: Result<Player, String>,
+    pub sliders: Vec<Entity<SliderState>>,
+    _subscriptions: Vec<Subscription>,
+}
+
+impl MixerState {
+    pub fn duration(&self) -> f64 {
+        self.stems[0].duration_secs()
     }
 }
 
@@ -105,6 +142,7 @@ impl AppView {
     fn player(&self) -> Option<&Result<Player, String>> {
         match &self.stage {
             Stage::Trim(st) => Some(&st.player),
+            Stage::Mixer(st) => Some(&st.player),
             _ => None,
         }
     }
@@ -117,6 +155,7 @@ impl AppView {
         }
         self.was_playing = playing;
         self.poll_decode(window, cx);
+        self.poll_separation(window, cx);
     }
 
     fn poll_decode(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -264,6 +303,163 @@ impl AppView {
         self.focus.focus(window, cx);
         cx.notify();
     }
+
+    pub fn start_separation(&mut self, cx: &mut Context<Self>) {
+        let Stage::Trim(st) = &mut self.stage else { return };
+        let duration = st.duration();
+        if let Err(e) = timeline::check_selection(st.selection, duration) {
+            st.input_error = Some(selection_message(e).into());
+            cx.notify();
+            return;
+        }
+        let mut audio = st.source[0].clone();
+        audio.trim(timeline::selection_to_range(st.selection, duration));
+        let (path, song) = (st.path.clone(), st.song.clone());
+        self.begin_processing(path, song, Arc::new(audio), cx);
+    }
+
+    pub fn retry(&mut self, cx: &mut Context<Self>) {
+        let Stage::Processing(st) = &self.stage else { return };
+        let (path, song, audio) = (st.path.clone(), st.song.clone(), st.audio.clone());
+        self.begin_processing(path, song, audio, cx);
+    }
+
+    fn begin_processing(&mut self, path: PathBuf, song: String, audio: Arc<StereoAudio>, cx: &mut Context<Self>) {
+        let rx = worker::spawn_separation(audio.clone());
+        // Replacing the stage drops the trim page's player, which stops playback.
+        self.stage = Stage::Processing(ProcessingState {
+            path,
+            song,
+            audio,
+            warmup: Separator::needs_warmup(),
+            step: Step::LoadModel,
+            progress: 0.0,
+            error: None,
+            rx: Some(rx),
+        });
+        cx.notify();
+    }
+
+    fn poll_separation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Stage::Processing(st) = &mut self.stage else { return };
+        let Some(rx) = st.rx.take() else { return };
+        let mut changed = false;
+        let mut done = None;
+        loop {
+            match rx.try_recv() {
+                Ok(SepMsg::Step(step)) => {
+                    st.step = step;
+                    changed = true;
+                }
+                Ok(SepMsg::Progress(p)) => {
+                    st.progress = p;
+                    changed = true;
+                }
+                Ok(SepMsg::Done(result)) => {
+                    done = Some((st.path.clone(), st.song.clone(), *result));
+                    break;
+                }
+                Ok(SepMsg::Failed(e)) => {
+                    st.error = Some(e);
+                    cx.notify();
+                    return;
+                }
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    st.error = Some(t().worker_stopped.to_string());
+                    cx.notify();
+                    return;
+                }
+            }
+        }
+        // `st`'s borrow of `self.stage` ends here (its last use above), which
+        // lets `enter_mixer` below take `&mut self` on this path.
+        if let Some((path, song, result)) = done {
+            self.enter_mixer(path, song, result, window, cx);
+            return;
+        }
+        st.rx = Some(rx);
+        if changed {
+            cx.notify();
+        }
+    }
+
+    fn enter_mixer(&mut self, path: PathBuf, song: String, result: Separated, window: &mut Window, cx: &mut Context<Self>) {
+        let stems = Arc::new(result.stems);
+        let controls = Arc::new(MixControls::new(stems.len()));
+        let mut sliders = Vec::with_capacity(stems.len());
+        let mut subscriptions = Vec::with_capacity(stems.len());
+        for i in 0..stems.len() {
+            let slider = cx.new(|_| {
+                SliderState::new().min(0.).max(100.).step(1.).default_value(100.)
+            });
+            let controls = controls.clone();
+            subscriptions.push(cx.subscribe_in(&slider, window, move |_, _, event: &SliderEvent, _, cx| {
+                let (SliderEvent::Change(value) | SliderEvent::Release(value)) = event;
+                controls.set_volume(i, value.end() / 100.0);
+                cx.notify();
+            }));
+            sliders.push(slider);
+        }
+        let player = Player::new(stems.clone(), controls.clone()).map_err(|e| format!("{e:#}"));
+        self.stage = Stage::Mixer(MixerState {
+            path,
+            song,
+            stems,
+            peaks: result.peaks,
+            chords: Arc::new(result.chords),
+            controls,
+            player,
+            sliders,
+            _subscriptions: subscriptions,
+        });
+        self.focus.focus(window, cx);
+        cx.notify();
+    }
+
+    pub fn toggle_mute(&mut self, track: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Stage::Mixer(st) = &self.stage {
+            st.controls.set_mute(track, !st.controls.get(track).mute);
+        }
+        self.focus.focus(window, cx);
+        cx.notify();
+    }
+
+    pub fn toggle_solo(&mut self, track: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Stage::Mixer(st) = &self.stage {
+            st.controls.set_solo(track, !st.controls.get(track).solo);
+        }
+        self.focus.focus(window, cx);
+        cx.notify();
+    }
+
+    /// Opening another song discards the stems, so confirm first.
+    pub fn confirm_open_new(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity().downgrade();
+        window.open_alert_dialog(cx, move |alert, _, _| {
+            let view = view.clone();
+            let s = t();
+            alert
+                .confirm()
+                .title(s.confirm_discard_title)
+                .description(s.confirm_discard_body)
+                // button_props replaces all props, so set it before the handlers.
+                .button_props(
+                    DialogButtonProps::default()
+                        .ok_text(s.confirm_open)
+                        .cancel_text(s.cancel),
+                )
+                .on_ok(move |_, window, cx| {
+                    view.update(cx, |this, cx| {
+                        this.back_to_empty(cx);
+                        this.open_file_dialog(window, cx);
+                    })
+                    .ok();
+                    true
+                })
+                .on_cancel(|_, _, _| true)
+        });
+    }
 }
 
 impl Render for AppView {
@@ -275,6 +471,8 @@ impl Render for AppView {
         let body = match &self.stage {
             Stage::Empty(_) => self.render_empty(cx).into_any_element(),
             Stage::Trim(_) => self.render_trim(cx).into_any_element(),
+            Stage::Processing(_) => self.render_processing(cx).into_any_element(),
+            Stage::Mixer(_) => self.render_mixer(cx).into_any_element(),
         };
         let theme = cx.theme();
         let (background, foreground) = (theme.background, theme.foreground);

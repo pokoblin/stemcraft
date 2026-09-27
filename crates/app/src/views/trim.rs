@@ -1,6 +1,6 @@
 //! ② Pick the part of the song to separate.
 
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use gpui_kit::component::{h_flex, v_flex, ActiveTheme as _};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -73,5 +73,13 @@ impl AppView {
             .child(div().text_sm().text_color(muted_fg).child(s.trim_hint))
             .child(div().h(px(200.)).w_full().child(wave))
             .child(times)
+            .child(
+                h_flex().justify_end().child(
+                    Button::new("start-separation")
+                        .primary()
+                        .label(s.start_separation)
+                        .on_click(cx.listener(|this, _, _, cx| this.start_separation(cx))),
+                ),
+            )
     }
 }

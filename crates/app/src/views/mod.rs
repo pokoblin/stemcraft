@@ -1,6 +1,8 @@
 //! Page renderers (as `impl AppView` blocks) and shared pieces.
 
 pub mod empty;
+pub mod mixer;
+pub mod processing;
 pub mod trim;
 pub mod waveform_view;
 
