@@ -16,6 +16,8 @@ ureq = "3.4.2"
 dirs = "7.0.0"
 flacenc = "0.5.1"
 rubato = "5.0.0"
+mp3lame-encoder = { version = "0.2.5", features = ["std"] }
+vorbis_rs = "0.5.6"
 
 [dev-dependencies]
 tempfile = "3.27.0"
