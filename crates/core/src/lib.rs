@@ -4,6 +4,7 @@
 
 pub mod audio;
 pub mod chords;
+pub mod export;
 pub mod mix;
 pub mod separation;
 pub mod timerange;
