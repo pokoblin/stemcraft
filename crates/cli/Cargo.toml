@@ -1,0 +1,10 @@
+[package]
+name = "stemcraft"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+stemcraft-core = { version = "0.1.0", path = "../core" }
+indicatif = "0.18.6"

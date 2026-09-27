@@ -1,0 +1,26 @@
+[project]
+name = "stemcraft"
+version = "0.1.0"
+description = "Isolate guitar / build guitar-free backing tracks on Apple Silicon (demucs-mlx)"
+authors = [
+    { name = "bindiry", email = "bindiry@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "demucs-mlx>=1.4.14",
+    "librosa>=1.0.0",
+    "numpy>=2.5.3",
+    "soundfile>=0.14.0",
+]
+
+[project.scripts]
+stemcraft = "stemcraft.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
