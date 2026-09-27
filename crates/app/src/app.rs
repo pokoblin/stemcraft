@@ -320,6 +320,7 @@ impl AppView {
 
     pub fn retry(&mut self, cx: &mut Context<Self>) {
         let Stage::Processing(st) = &self.stage else { return };
+        if st.error.is_none() { return; }
         let (path, song, audio) = (st.path.clone(), st.song.clone(), st.audio.clone());
         self.begin_processing(path, song, audio, cx);
     }
@@ -372,8 +373,9 @@ impl AppView {
                 }
             }
         }
-        // `st`'s borrow of `self.stage` ends here (its last use above), which
-        // lets `enter_mixer` below take `&mut self` on this path.
+        // `st`'s borrow of `self.stage` ends when the `if let` below executes and
+        // returns (at line 379), since `st` is not used after that return.
+        // This lets `enter_mixer` below take `&mut self` on this path.
         if let Some((path, song, result)) = done {
             self.enter_mixer(path, song, result, window, cx);
             return;
@@ -443,11 +445,13 @@ impl AppView {
                 .confirm()
                 .title(s.confirm_discard_title)
                 .description(s.confirm_discard_body)
-                // button_props replaces all props, so set it before the handlers.
+                // button_props replaces all props including show_cancel, so set it before the handlers
+                // and add show_cancel(true) to restore the Cancel button.
                 .button_props(
                     DialogButtonProps::default()
                         .ok_text(s.confirm_open)
-                        .cancel_text(s.cancel),
+                        .cancel_text(s.cancel)
+                        .show_cancel(true),
                 )
                 .on_ok(move |_, window, cx| {
                     view.update(cx, |this, cx| {
