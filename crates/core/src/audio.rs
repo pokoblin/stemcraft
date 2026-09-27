@@ -66,22 +66,7 @@ impl StereoAudio {
 
 /// Unity-gain sum of equally long tracks at the same sample rate.
 pub fn sum_tracks(tracks: &[&StereoAudio]) -> Result<StereoAudio> {
-    let Some(first) = tracks.first() else {
-        bail!("nothing to mix")
-    };
-    let mut out = StereoAudio::silent(first.len(), first.sample_rate);
-    for track in tracks {
-        if track.len() != out.len() || track.sample_rate != out.sample_rate {
-            bail!("cannot mix tracks of different length or sample rate");
-        }
-        for (acc, s) in out.left.iter_mut().zip(&track.left) {
-            *acc += s;
-        }
-        for (acc, s) in out.right.iter_mut().zip(&track.right) {
-            *acc += s;
-        }
-    }
-    Ok(out)
+    crate::mix::mixdown(tracks, &vec![1.0; tracks.len()])
 }
 
 /// Decode an audio file (WAV, AIFF, FLAC, MP3, OGG Vorbis, AAC/ALAC in M4A).
