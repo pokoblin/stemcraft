@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 use crate::audio::{write_wav, StereoAudio};
 
 mod flac;
+mod m4a;
 mod mp3;
 mod ogg;
 mod resample;
@@ -62,7 +63,7 @@ pub fn write(path: &Path, audio: &StereoAudio, format: ExportFormat) -> Result<(
         ExportFormat::Wav => write_wav(path, audio),
         ExportFormat::Flac => flac::write(path, audio),
         ExportFormat::Mp3 => mp3::write(path, &for_lossy(audio)?),
-        ExportFormat::M4a => bail!("{} export is not implemented yet", format.label()),
+        ExportFormat::M4a => m4a::write(path, &for_lossy(audio)?),
         ExportFormat::Ogg => ogg::write(path, &clamped(audio)),
     }
 }
@@ -191,5 +192,24 @@ mod tests {
         assert_eq!(lossy_rate(48_000), 48_000);
         assert_eq!(lossy_rate(96_000), 48_000);
         assert_eq!(lossy_rate(22_050), 44_100);
+    }
+
+    #[test]
+    fn m4a_roundtrip_44k() {
+        roundtrip(ExportFormat::M4a, 44_100, 44_100, 0.08);
+    }
+
+    #[test]
+    fn m4a_roundtrip_48k() {
+        roundtrip(ExportFormat::M4a, 48_000, 48_000, 0.08);
+    }
+
+    #[test]
+    fn m4a_overwrites_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.m4a");
+        std::fs::write(&path, b"junk").unwrap();
+        write(&path, &sine(44_100, 0.5), ExportFormat::M4a).unwrap();
+        assert!(std::fs::metadata(&path).unwrap().len() > 1000);
     }
 }
