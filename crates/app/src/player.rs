@@ -3,7 +3,10 @@
 //! requesting another rate would switch the device system-wide — so the engine
 //! resamples on the fly with linear interpolation.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{
+    AtomicBool, AtomicU64,
+    Ordering::{Acquire, Relaxed, Release},
+};
 use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
@@ -35,12 +38,16 @@ impl Default for Transport {
 }
 
 impl Transport {
+    /// Acquire, paired with `set_playing`'s Release: once this observes `true`,
+    /// a seek requested (Relaxed) before that `set_playing` call is guaranteed
+    /// visible to a subsequent `take_seek`.
     pub fn is_playing(&self) -> bool {
-        self.playing.load(Relaxed)
+        self.playing.load(Acquire)
     }
 
+    /// Release, paired with `is_playing`'s Acquire (see there).
     pub fn set_playing(&self, on: bool) {
-        self.playing.store(on, Relaxed);
+        self.playing.store(on, Release);
     }
 
     /// Current position in source frames.
@@ -62,6 +69,37 @@ impl Transport {
         let bits = self.seek.swap(NO_SEEK, Relaxed);
         (bits != NO_SEEK).then(|| f64::from_bits(bits))
     }
+
+    /// True if a seek has been requested but not yet applied by `render`.
+    fn seek_pending(&self) -> bool {
+        self.seek.load(Relaxed) != NO_SEEK
+    }
+}
+
+/// Validates that `tracks` is safe for `Engine`/`Player` to index and iterate
+/// over in lockstep: non-empty, every track's left and right channels the same
+/// length, every track the same length as the others, and every track sharing
+/// one non-zero sample rate. Not re-checked on the audio thread.
+fn check_tracks(tracks: &[StereoAudio]) -> Result<()> {
+    let Some(first) = tracks.first() else {
+        bail!("no tracks to play");
+    };
+    let (len, sample_rate) = (first.len(), first.sample_rate);
+    for track in tracks {
+        if track.left.len() != track.right.len() {
+            bail!("track's left and right channels have different lengths");
+        }
+        if track.len() != len {
+            bail!("tracks have different lengths");
+        }
+        if track.sample_rate != sample_rate {
+            bail!("tracks have different sample rates");
+        }
+        if track.sample_rate == 0 {
+            bail!("track has a sample rate of 0");
+        }
+    }
+    Ok(())
 }
 
 /// Mixes equally long tracks into interleaved device frames.
@@ -78,6 +116,10 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// `tracks` must already satisfy `check_tracks` (non-empty; equal left/right
+    /// lengths; equal length and equal non-zero sample rate across all tracks).
+    /// This is validated once by the caller (`Player::new`) and is not re-checked
+    /// here or on the audio thread.
     pub fn new(
         tracks: Arc<Vec<StereoAudio>>,
         controls: Arc<MixControls>,
@@ -103,10 +145,15 @@ impl Engine {
     /// no allocation.
     pub fn render(&mut self, out: &mut [f32]) {
         out.fill(0.0);
+        // Read `playing` before the seek (see `Transport::is_playing`): if we
+        // observe `true` here, any seek requested before that call is
+        // guaranteed visible to `take_seek` below, so a play press right after
+        // a seek is never missed.
+        let playing = self.transport.is_playing();
         if let Some(frames) = self.transport.take_seek() {
-            self.pos = frames;
+            self.pos = frames; // a seek must still apply while paused
         }
-        if !self.transport.is_playing() {
+        if !playing {
             return;
         }
         self.controls.read_into(&mut self.mix);
@@ -136,7 +183,11 @@ impl Engine {
             }
             self.pos += self.step;
         }
-        self.transport.set_position(self.pos.min(len as f64));
+        // Publish the position only if no seek arrived during this callback,
+        // so a UI seek made mid-callback isn't overwritten for one buffer.
+        if !self.transport.seek_pending() {
+            self.transport.set_position(self.pos.min(len as f64));
+        }
     }
 }
 
@@ -150,6 +201,7 @@ pub struct Player {
 
 impl Player {
     pub fn new(tracks: Arc<Vec<StereoAudio>>, controls: Arc<MixControls>) -> Result<Self> {
+        check_tracks(&tracks)?;
         let frames = tracks[0].len();
         let sample_rate = tracks[0].sample_rate;
         let transport = Arc::new(Transport::default());
@@ -296,5 +348,70 @@ mod tests {
         let mut out = vec![0.0; 2];
         e.render(&mut out);
         assert_eq!(out[0], 2.0);
+    }
+
+    #[test]
+    fn seeking_and_playing_after_the_end_resumes_from_zero() {
+        let (mut e, _, transport) = engine(vec![track(vec![5.0, 6.0], vec![5.0, 6.0], 4)], 4, 2);
+        transport.set_playing(true);
+        // Overshoot the 2-frame track so the engine stops mid-buffer.
+        let mut out = vec![0.0; 8];
+        e.render(&mut out);
+        assert!(!transport.is_playing());
+
+        // Mirrors `Player::toggle`: request_seek(0.0) then set_playing(true).
+        transport.request_seek(0.0);
+        transport.set_playing(true);
+        let mut out = vec![0.0; 4];
+        e.render(&mut out);
+        assert_eq!(out, vec![5.0, 5.0, 6.0, 6.0]);
+        assert!(transport.is_playing());
+    }
+
+    #[test]
+    fn downmixes_to_mono_by_averaging_left_and_right() {
+        let (mut e, _, transport) = engine(vec![track(vec![2.0], vec![4.0], 4)], 4, 1);
+        transport.set_playing(true);
+        let mut out = vec![0.0; 1];
+        e.render(&mut out);
+        assert_eq!(out, vec![3.0]);
+    }
+
+    fn ok_track() -> StereoAudio {
+        track(vec![0.0; 4], vec![0.0; 4], 4)
+    }
+
+    #[test]
+    fn check_tracks_accepts_matching_tracks() {
+        assert!(check_tracks(&[ok_track(), ok_track()]).is_ok());
+    }
+
+    #[test]
+    fn check_tracks_rejects_empty() {
+        assert!(check_tracks(&[]).is_err());
+    }
+
+    #[test]
+    fn check_tracks_rejects_mismatched_channel_lengths() {
+        let bad = track(vec![0.0; 4], vec![0.0; 3], 4);
+        assert!(check_tracks(&[bad]).is_err());
+    }
+
+    #[test]
+    fn check_tracks_rejects_different_track_lengths() {
+        let short = track(vec![0.0; 3], vec![0.0; 3], 4);
+        assert!(check_tracks(&[ok_track(), short]).is_err());
+    }
+
+    #[test]
+    fn check_tracks_rejects_different_sample_rates() {
+        let other_rate = track(vec![0.0; 4], vec![0.0; 4], 8);
+        assert!(check_tracks(&[ok_track(), other_rate]).is_err());
+    }
+
+    #[test]
+    fn check_tracks_rejects_zero_sample_rate() {
+        let zero_rate = track(vec![0.0; 4], vec![0.0; 4], 0);
+        assert!(check_tracks(&[zero_rate]).is_err());
     }
 }
