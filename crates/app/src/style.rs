@@ -14,7 +14,10 @@ pub const TOOLBAR_H: f32 = 40.;
 pub const STATUS_H: f32 = 24.;
 pub const RULER_H: f32 = 22.;
 pub const CHORD_LANE_H: f32 = 26.;
-pub const TRACK_HEADER_W: f32 = 210.;
+// Budget (mixer track header): 4 colour bar + 15 icon + 56 name + 22 M + 22 S
+// + 34 percent + 6×gap_1 (4px) + pr_3 (12px) = 189px fixed, leaving ≥ 80px for
+// the volume slider.
+pub const TRACK_HEADER_W: f32 = 280.;
 /// Room for the macOS traffic lights at the left of the title bar.
 pub const TRAFFIC_LIGHT_GUTTER: f32 = 80.;
 

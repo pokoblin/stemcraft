@@ -327,10 +327,18 @@ impl AppView {
             old.pause();
         }
         let player = self.open_player(tracks, controls, window, cx);
-        if let Ok(p) = &player {
-            p.seek_frac(position);
-            if playing {
-                p.toggle();
+        match &player {
+            Ok(p) => {
+                p.seek_frac(position);
+                if playing {
+                    p.toggle();
+                }
+            }
+            Err(e) => {
+                // The old player has already been paused and replaced above,
+                // so the user must be told playback is now unavailable.
+                let message = format!("{}{}{e}", t().no_audio_device, t().reason_sep);
+                window.push_notification(Notification::error(message), cx);
             }
         }
         match &mut self.stage {

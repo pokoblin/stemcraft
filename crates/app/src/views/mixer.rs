@@ -118,7 +118,7 @@ impl AppView {
                 .w(px(TRACK_HEADER_W))
                 .flex_none()
                 .h_full()
-                .gap_2()
+                .gap_1()
                 .pr_3()
                 .items_center()
                 .bg(panel)
@@ -126,7 +126,7 @@ impl AppView {
                 .border_color(border)
                 .child(div().w(px(4.)).h_full().bg(color))
                 .child(Icon::new(STEM_ICONS[i]).size(px(15.)).text_color(color))
-                .child(div().w(px(36.)).text_sm().truncate().child(s.stems[i]))
+                .child(div().w(px(56.)).text_sm().truncate().child(s.stems[i]))
                 .child(
                     toggle(("mute", i), "M", m.mute, mute_bg, white())
                         .on_click(cx.listener(move |this, _, window, cx| this.toggle_mute(i, window, cx))),
