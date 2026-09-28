@@ -13,7 +13,7 @@ pub const LICENSES: &[License] = &[
     License { name: "libvorbis (aoTuV), vorbis_rs", license: "BSD-3-Clause", text: include_str!("../licenses/libvorbis.txt") },
     License { name: "libogg", license: "BSD-3-Clause", text: include_str!("../licenses/libogg.txt") },
     License { name: "Lucide icons", license: "ISC", text: include_str!("../licenses/lucide.txt") },
-    License { name: "gpui, gpui-kit", license: "Apache-2.0", text: include_str!("../licenses/apache-2.0.txt") },
+    License { name: "gpui, gpui-kit", license: "Apache-2.0", text: include_str!("../licenses/gpui-apache-2.0.txt") },
     License { name: "Symphonia", license: "MPL-2.0", text: include_str!("../licenses/mpl-2.0.txt") },
     License { name: "Burn, CubeCL", license: "MIT OR Apache-2.0", text: include_str!("../licenses/burn-mit.txt") },
     License { name: "demucs-rs", license: "Apache-2.0", text: include_str!("../licenses/apache-2.0.txt") },

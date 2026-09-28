@@ -16,28 +16,67 @@ use stemcraft_core::{separation, weights};
 use crate::app_state::{self, AppSettings};
 use crate::i18n::{fill, t};
 use crate::licenses::LICENSES;
-use crate::player::{choose_device, output_devices, DeviceChoice};
+use crate::player::{choose_device, output_devices, DeviceChoice, DeviceInfo};
 use crate::settings::{format_bytes, Appearance, ExportLocation, Language, OutputDevice};
 use crate::views::toolbar::title_bar;
 
 pub struct SettingsView {
     /// Indices of the expanded license entries (the accordion is controlled).
     open_licenses: Vec<usize>,
+    /// Cached results of `refresh`: output devices (CoreAudio enumeration),
+    /// the GPU cache size (a recursive directory walk) and whether the model
+    /// is bundled (a file stat). These are too expensive to probe on every
+    /// render — `Settings` rebuilds all pages on every redraw (sidebar
+    /// clicks, a dropdown opening, an accordion toggle, a notification
+    /// animating, a resize) — so they're refreshed only when the window
+    /// (re)activates or after a cache clear.
+    devices: Vec<DeviceInfo>,
+    cache_size: u64,
+    bundled: bool,
     _subscriptions: Vec<Subscription>,
 }
 
 impl SettingsView {
-    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Fields write the globals; the Settings component doesn't re-render by itself.
         let subscriptions = vec![
             cx.observe_global::<AppSettings>(|_, cx| cx.notify()),
             cx.observe_global::<app_state::Busy>(|_, cx| cx.notify()),
+            // Coming back to the settings window (⌘, after switching away and
+            // back) is the only other time the cached probes can go stale.
+            cx.observe_window_activation(window, |this, window, cx| {
+                if window.is_window_active() {
+                    this.refresh();
+                    cx.notify();
+                }
+            }),
         ];
-        Self { open_licenses: Vec::new(), _subscriptions: subscriptions }
+        let mut this = Self {
+            open_licenses: Vec::new(),
+            devices: Vec::new(),
+            cache_size: 0,
+            bundled: false,
+            _subscriptions: subscriptions,
+        };
+        this.refresh();
+        this
+    }
+
+    fn refresh(&mut self) {
+        self.devices = output_devices();
+        self.cache_size = separation::gpu_cache_size();
+        self.bundled = weights::is_bundled();
     }
 
     fn pages(&self, cx: &mut Context<Self>) -> Vec<SettingPage> {
-        vec![general_page(), export_page(cx), audio_page(cx), storage_page(cx), self.about_page(cx)]
+        let view = cx.entity().downgrade();
+        vec![
+            general_page(),
+            export_page(cx),
+            audio_page(cx, &self.devices),
+            storage_page(cx, self.cache_size, self.bundled, view),
+            self.about_page(cx),
+        ]
     }
 
     fn about_page(&self, cx: &mut Context<Self>) -> SettingPage {
@@ -274,9 +313,9 @@ fn choose_export_folder(cx: &mut App) {
     .detach();
 }
 
-fn audio_page(cx: &App) -> SettingPage {
+fn audio_page(cx: &App, devices: &[DeviceInfo]) -> SettingPage {
     let s = t();
-    let devices = output_devices();
+    let devices = devices.to_vec();
     let saved = AppSettings::get(cx).output_device.clone();
     let mut options: Vec<(SharedString, SharedString)> = vec![("".into(), s.system_default_device.into())];
     options.extend(devices.iter().map(|d| (d.id.clone().into(), d.name.clone().into())));
@@ -315,11 +354,11 @@ fn audio_page(cx: &App) -> SettingPage {
         ))
 }
 
-fn storage_page(cx: &App) -> SettingPage {
+fn storage_page(cx: &App, cache_size: u64, bundled: bool, view: WeakEntity<SettingsView>) -> SettingPage {
     let s = t();
-    let size = format_bytes(separation::gpu_cache_size());
+    let size = format_bytes(cache_size);
     let busy = app_state::is_busy(cx);
-    let model = if weights::is_bundled() { s.model_bundled } else { s.model_cached };
+    let model = if bundled { s.model_bundled } else { s.model_cached };
     SettingPage::new(s.page_storage)
         .icon(Icon::new(Lucide::HardDrive))
         .resettable(false)
@@ -327,6 +366,7 @@ fn storage_page(cx: &App) -> SettingPage {
             SettingItem::new(
                 s.gpu_cache,
                 SettingField::render(move |options, _, cx| {
+                    let view = view.clone();
                     h_flex()
                         .gap_3()
                         .items_center()
@@ -337,7 +377,7 @@ fn storage_page(cx: &App) -> SettingPage {
                                 .with_size(options.size())
                                 .label(t().clear)
                                 .disabled(busy)
-                                .on_click(|_, window, cx| confirm_clear_cache(window, cx)),
+                                .on_click(move |_, window, cx| confirm_clear_cache(window, cx, view.clone())),
                         )
                 }),
             )
@@ -351,8 +391,9 @@ fn storage_page(cx: &App) -> SettingPage {
         ]))
 }
 
-fn confirm_clear_cache(window: &mut Window, cx: &mut App) {
-    window.open_alert_dialog(cx, |alert, _, _| {
+fn confirm_clear_cache(window: &mut Window, cx: &mut App, view: WeakEntity<SettingsView>) {
+    window.open_alert_dialog(cx, move |alert, _, _| {
+        let view = view.clone();
         let s = t();
         alert
             .confirm()
@@ -365,7 +406,7 @@ fn confirm_clear_cache(window: &mut Window, cx: &mut App) {
                     .cancel_text(s.cancel)
                     .show_cancel(true),
             )
-            .on_ok(|_, window, cx| {
+            .on_ok(move |_, window, cx| {
                 // Check again: a split may have started since the dialog opened.
                 let note = if app_state::is_busy(cx) {
                     Notification::warning(t().clear_busy)
@@ -376,7 +417,14 @@ fn confirm_clear_cache(window: &mut Window, cx: &mut App) {
                     }
                 };
                 window.push_notification(note, cx);
-                cx.refresh_windows();
+                // The cache size (and possibly the bundled/devices state)
+                // just changed; re-probe it instead of leaving the stale
+                // cached value on screen.
+                view.update(cx, |this, cx| {
+                    this.refresh();
+                    cx.notify();
+                })
+                .ok();
                 true
             })
             .on_cancel(|_, _, _| true)
