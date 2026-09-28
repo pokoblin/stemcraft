@@ -255,7 +255,7 @@ impl AppView {
             })
             .collect();
         let source = Arc::new(vec![decoded.audio]);
-        let player = Player::new(source.clone(), Arc::new(MixControls::new(1)))
+        let player = Player::new(source.clone(), Arc::new(MixControls::new(1)), None)
             .map_err(|e| format!("{e:#}"));
         self.stage = Stage::Trim(TrimState {
             song: naming::song_name(&path),
@@ -445,7 +445,7 @@ impl AppView {
             }));
             sliders.push(slider);
         }
-        let player = Player::new(stems.clone(), controls.clone()).map_err(|e| format!("{e:#}"));
+        let player = Player::new(stems.clone(), controls.clone(), None).map_err(|e| format!("{e:#}"));
         self.stage = Stage::Mixer(MixerState {
             path,
             song,

@@ -1,5 +1,6 @@
 //! Clock text and selection fractions ↔ seconds.
 
+use stemcraft_core::chords::Chord;
 use stemcraft_core::timerange::{parse_clock, TimeRange};
 
 /// Shortest part of a song worth separating.
@@ -15,6 +16,39 @@ pub enum SelectionError {
 pub fn format_clock(secs: f64) -> String {
     let total = secs.max(0.0).floor() as u64;
     format!("{}:{:02}", total / 60, total % 60)
+}
+
+/// `mm:ss.d`, truncated to tenths — the toolbar clock.
+pub fn format_clock_precise(secs: f64) -> String {
+    let tenths = (secs.max(0.0) * 10.0).floor() as u64;
+    format!("{:02}:{:02}.{}", tenths / 600, tenths / 10 % 60, tenths % 10)
+}
+
+const RULER_STEPS: [f64; 10] = [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0];
+/// Minimum horizontal distance between two ruler labels.
+const RULER_MIN_GAP_PX: f64 = 60.0;
+
+/// Seconds between ruler labels so they stay at least ~60 px apart.
+pub fn ruler_step(duration: f64, width_px: f64) -> f64 {
+    if duration <= 0.0 || width_px <= 0.0 {
+        return 60.0;
+    }
+    let px_per_sec = width_px / duration;
+    RULER_STEPS
+        .into_iter()
+        .find(|step| step * px_per_sec >= RULER_MIN_GAP_PX)
+        .unwrap_or(600.0)
+}
+
+/// Sample rate in kHz for display: "44.1", "48".
+pub fn khz(sample_rate: u32) -> String {
+    let khz = sample_rate as f64 / 1000.0;
+    if khz.fract() == 0.0 { format!("{khz:.0}") } else { format!("{khz:.1}") }
+}
+
+/// Index of the chord sounding at `secs`.
+pub fn chord_at(chords: &[Chord], secs: f64) -> Option<usize> {
+    chords.iter().position(|c| secs >= c.start && secs < c.end)
 }
 
 pub fn frac_to_secs(frac: f32, duration: f64) -> f64 {
@@ -89,6 +123,42 @@ pub fn edited_selection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn precise_clock_has_tenths() {
+        assert_eq!(format_clock_precise(0.0), "00:00.0");
+        assert_eq!(format_clock_precise(72.46), "01:12.4");
+        assert_eq!(format_clock_precise(3600.0), "60:00.0");
+        assert_eq!(format_clock_precise(-1.0), "00:00.0");
+    }
+
+    #[test]
+    fn ruler_step_keeps_labels_apart() {
+        assert_eq!(ruler_step(225.0, 800.0), 30.0);
+        assert_eq!(ruler_step(10.0, 800.0), 1.0);
+        assert_eq!(ruler_step(7200.0, 300.0), 600.0);
+        assert_eq!(ruler_step(0.0, 800.0), 60.0);
+    }
+
+    #[test]
+    fn khz_trims_whole_numbers() {
+        assert_eq!(khz(44_100), "44.1");
+        assert_eq!(khz(48_000), "48");
+        assert_eq!(khz(96_000), "96");
+    }
+
+    #[test]
+    fn chord_at_finds_the_segment() {
+        use stemcraft_core::chords::Chord;
+        let chords = [
+            Chord { start: 0.0, end: 1.0, label: "C".into() },
+            Chord { start: 1.0, end: 2.0, label: "G".into() },
+        ];
+        assert_eq!(chord_at(&chords, 0.5), Some(0));
+        assert_eq!(chord_at(&chords, 1.0), Some(1));
+        assert_eq!(chord_at(&chords, 2.0), None);
+        assert_eq!(chord_at(&chords, -1.0), None);
+    }
 
     #[test]
     fn formats_minutes_and_seconds() {

@@ -3,6 +3,7 @@
 //! requesting another rate would switch the device system-wide — so the engine
 //! resamples on the fly with linear interpolation.
 
+use std::str::FromStr;
 use std::sync::atomic::{
     AtomicBool, AtomicU64,
     Ordering::{Acquire, Relaxed, Release},
@@ -102,6 +103,40 @@ fn check_tracks(tracks: &[StereoAudio]) -> Result<()> {
     Ok(())
 }
 
+/// An output device as listed for the user. `id` is cpal's stable device id
+/// (`DeviceId`'s `Display` form); `name` is only for display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceInfo {
+    pub id: String,
+    pub name: String,
+}
+
+/// Output devices present right now. Doesn't open any stream.
+pub fn output_devices() -> Vec<DeviceInfo> {
+    let Ok(devices) = cpal::default_host().output_devices() else {
+        return Vec::new();
+    };
+    devices
+        .filter_map(|d| Some(DeviceInfo { id: d.id().ok()?.to_string(), name: d.to_string() }))
+        .collect()
+}
+
+/// How a saved device id resolves against the devices present now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceChoice {
+    SystemDefault,
+    Saved,
+    Missing,
+}
+
+pub fn choose_device(saved: Option<&str>, available: &[DeviceInfo]) -> DeviceChoice {
+    match saved {
+        None => DeviceChoice::SystemDefault,
+        Some(id) if available.iter().any(|d| d.id == id) => DeviceChoice::Saved,
+        Some(_) => DeviceChoice::Missing,
+    }
+}
+
 /// Mixes equally long tracks into interleaved device frames.
 pub struct Engine {
     tracks: Arc<Vec<StereoAudio>>,
@@ -197,18 +232,29 @@ pub struct Player {
     transport: Arc<Transport>,
     frames: usize,
     sample_rate: u32,
+    device_name: String,
+    fell_back: bool,
 }
 
 impl Player {
-    pub fn new(tracks: Arc<Vec<StereoAudio>>, controls: Arc<MixControls>) -> Result<Self> {
+    pub fn new(tracks: Arc<Vec<StereoAudio>>, controls: Arc<MixControls>, device_id: Option<&str>) -> Result<Self> {
         check_tracks(&tracks)?;
         let frames = tracks[0].len();
         let sample_rate = tracks[0].sample_rate;
         let transport = Arc::new(Transport::default());
 
-        let device = cpal::default_host()
-            .default_output_device()
-            .context("no audio output device")?;
+        let host = cpal::default_host();
+        let saved = device_id
+            .and_then(|id| cpal::DeviceId::from_str(id).ok())
+            .and_then(|id| host.device_by_id(&id));
+        // A saved device that's gone (unplugged) falls back to the default.
+        let fell_back = device_id.is_some() && saved.is_none();
+        let device = match saved {
+            Some(device) => device,
+            None => host.default_output_device().context("no audio output device")?,
+        };
+        let device_name = device.to_string();
+
         let supported = device
             .default_output_config()
             .context("cannot read the output device's configuration")?;
@@ -236,6 +282,8 @@ impl Player {
             transport,
             frames,
             sample_rate,
+            device_name,
+            fell_back,
         })
     }
 
@@ -278,11 +326,31 @@ impl Player {
     pub fn duration_secs(&self) -> f64 {
         self.frames as f64 / self.sample_rate as f64
     }
+
+    pub fn device_name(&self) -> &str {
+        &self.device_name
+    }
+
+    /// True when the saved device was missing and the default was used.
+    pub fn fell_back(&self) -> bool {
+        self.fell_back
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn choose_device_resolves_saved_ids() {
+        let devices = [
+            DeviceInfo { id: "coreaudio:A".into(), name: "Speakers".into() },
+            DeviceInfo { id: "coreaudio:B".into(), name: "Interface".into() },
+        ];
+        assert_eq!(choose_device(None, &devices), DeviceChoice::SystemDefault);
+        assert_eq!(choose_device(Some("coreaudio:B"), &devices), DeviceChoice::Saved);
+        assert_eq!(choose_device(Some("coreaudio:Z"), &devices), DeviceChoice::Missing);
+    }
 
     fn track(left: Vec<f32>, right: Vec<f32>, sample_rate: u32) -> StereoAudio {
         StereoAudio { left, right, sample_rate }
