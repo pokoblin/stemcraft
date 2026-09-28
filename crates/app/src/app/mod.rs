@@ -95,6 +95,8 @@ pub struct ProcessingState {
     pub progress: f32,
     pub error: Option<String>,
     pub rx: Option<mpsc::Receiver<SepMsg>>,
+    /// Selected part of the song, in seconds.
+    pub range: (f64, f64),
 }
 
 pub struct MixerState {
@@ -107,6 +109,8 @@ pub struct MixerState {
     pub controls: Arc<MixControls>,
     pub player: Result<Player, String>,
     pub sliders: Vec<Entity<SliderState>>,
+    /// Selected part of the song, in seconds.
+    pub range: (f64, f64),
     _subscriptions: Vec<Subscription>,
 }
 
@@ -352,15 +356,21 @@ impl Render for AppView {
         };
         let theme = cx.theme();
         let (background, foreground) = (theme.background, theme.foreground);
+        let toolbar = self.render_toolbar(window, cx).into_any_element();
+        let status = self.render_status_bar(cx).into_any_element();
         div()
             .id("stemcraft")
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::on_toggle_play))
             .size_full()
+            .flex()
+            .flex_col()
             .bg(background)
             .text_color(foreground)
-            .child(body)
+            .child(toolbar)
+            .child(div().flex_1().min_h_0().child(body))
+            .child(status)
             .children(sheet_layer)
             .children(dialog_layer)
             .children(notification_layer)

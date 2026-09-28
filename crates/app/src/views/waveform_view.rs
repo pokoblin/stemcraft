@@ -8,21 +8,26 @@ use std::sync::Arc;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 
+use crate::style::playhead;
 use crate::waveform::columns;
 
 /// Movement (fraction of the width) before a press counts as a drag.
 const DRAG_THRESHOLD: f32 = 0.003;
 const BAR_PITCH: f32 = 2.0;
 const BAR_WIDTH: f32 = 1.5;
+/// Grab distance (px) around a selection edge that drags that edge.
+const HANDLE_GRAB_PX: f32 = 6.0;
+const HANDLE_W: f32 = 3.0;
 
 pub struct WaveformProps {
     pub peaks: Arc<[(f32, f32)]>,
+    pub color: Hsla,
     pub playhead: Option<f32>,
     pub selection: Option<(f32, f32)>,
     pub dimmed: bool,
 }
 
-fn fraction(position: Point<Pixels>, bounds: Bounds<Pixels>) -> f32 {
+pub(crate) fn fraction(position: Point<Pixels>, bounds: Bounds<Pixels>) -> f32 {
     if bounds.size.width <= px(0.) {
         return 0.0;
     }
@@ -40,13 +45,12 @@ pub fn waveform(
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
-    let bar_color = if props.dimmed {
-        theme.muted_foreground.opacity(0.35)
-    } else {
-        theme.primary.opacity(0.85)
-    };
-    let selection_color = theme.primary.opacity(0.15);
-    let background = theme.muted;
+    let bar_color = props.color.opacity(if props.dimmed { 0.28 } else { 0.9 });
+    // Everything outside the selection is dimmed with the window background.
+    let shade = theme.background.opacity(0.6);
+    let handle_color = theme.primary;
+    let line = playhead(cx);
+    let selection = props.selection;
 
     // Event handlers get no bounds; the canvas stores them during prepaint.
     let bounds_cell = Rc::new(Cell::new(Bounds::<Pixels>::default()));
@@ -55,16 +59,28 @@ pub fn waveform(
     div()
         .id(id)
         .size_full()
-        .rounded_md()
-        .bg(background)
         .overflow_hidden()
         .cursor_pointer()
         .on_mouse_down(MouseButton::Left, {
             let bounds_cell = bounds_cell.clone();
             let anchor = drag_anchor.clone();
             move |event: &MouseDownEvent, window, cx| {
-                let frac = fraction(event.position, bounds_cell.get());
+                let bounds = bounds_cell.get();
+                let frac = fraction(event.position, bounds);
                 if let Some(anchor) = &anchor {
+                    // Grabbing a selection edge drags that edge: anchor the other one.
+                    if let Some((start, end)) = selection {
+                        let width = f32::from(bounds.size.width);
+                        let near = |edge: f32| (frac - edge).abs() * width <= HANDLE_GRAB_PX;
+                        if near(end) {
+                            anchor.set(Some(start));
+                            return;
+                        }
+                        if near(start) {
+                            anchor.set(Some(end));
+                            return;
+                        }
+                    }
                     anchor.set(Some(frac));
                 }
                 on_seek(&frac, window, cx);
@@ -76,15 +92,6 @@ pub fn waveform(
                 move |bounds, (), window, _| {
                     let width = f32::from(bounds.size.width);
                     let height = f32::from(bounds.size.height);
-                    if let Some((start, end)) = props.selection {
-                        window.paint_quad(fill(
-                            Bounds::new(
-                                point(bounds.origin.x + px(start * width), bounds.origin.y),
-                                size(px((end - start) * width), bounds.size.height),
-                            ),
-                            selection_color,
-                        ));
-                    }
                     let mid = f32::from(bounds.origin.y) + height / 2.0;
                     let cols = columns(&props.peaks, (width / BAR_PITCH).max(1.0) as usize);
                     for (i, (lo, hi)) in cols.iter().enumerate() {
@@ -98,13 +105,34 @@ pub fn waveform(
                             bar_color,
                         ));
                     }
+                    if let Some((start, end)) = props.selection {
+                        let x0 = bounds.origin.x;
+                        window.paint_quad(fill(
+                            Bounds::new(point(x0, bounds.origin.y), size(px(start * width), bounds.size.height)),
+                            shade,
+                        ));
+                        window.paint_quad(fill(
+                            Bounds::new(
+                                point(x0 + px(end * width), bounds.origin.y),
+                                size(px((1.0 - end) * width), bounds.size.height),
+                            ),
+                            shade,
+                        ));
+                        for edge in [start, end] {
+                            let x = (edge * width - HANDLE_W / 2.0).clamp(0.0, (width - HANDLE_W).max(0.0));
+                            window.paint_quad(fill(
+                                Bounds::new(point(x0 + px(x), bounds.origin.y), size(px(HANDLE_W), bounds.size.height)),
+                                handle_color,
+                            ));
+                        }
+                    }
                     if let Some(frac) = props.playhead {
                         window.paint_quad(fill(
                             Bounds::new(
                                 point(bounds.origin.x + px(frac * width), bounds.origin.y),
                                 size(px(1.5), bounds.size.height),
                             ),
-                            red(),
+                            line,
                         ));
                     }
                     // Window-level listeners keep tracking a drag outside the element.

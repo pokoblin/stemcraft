@@ -9,8 +9,7 @@ use stemcraft_core::chords::{Chord, NO_CHORD};
 use stemcraft_core::mix::gains;
 
 use crate::app::{AppView, MixerState, Stage};
-use crate::i18n::{fill, t};
-use crate::views::transport;
+use crate::i18n::t;
 use crate::views::waveform_view::{waveform, WaveformProps};
 
 /// Width of the controls column, so lanes and waveforms line up.
@@ -19,35 +18,11 @@ const LABEL_W: f32 = 300.;
 impl AppView {
     pub(crate) fn render_mixer(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let Stage::Mixer(st) = &self.stage else { unreachable!() };
-        let s = t();
         let duration = st.duration();
-        let (playhead, position, playing) = match &st.player {
-            Ok(p) => (p.position_frac(), p.position_secs(), p.is_playing()),
-            Err(_) => (0.0, 0.0, false),
+        let (playhead, position) = match &st.player {
+            Ok(p) => (p.position_frac(), p.position_secs()),
+            Err(_) => (0.0, 0.0),
         };
-
-        let export: AnyElement = match &self.export {
-            Some(p) => div()
-                .text_sm()
-                .child(fill(
-                    s.exporting,
-                    &[("done", p.done.to_string().as_str()), ("total", p.total.to_string().as_str())],
-                ))
-                .into_any_element(),
-            None => Button::new("export")
-                .label(s.export)
-                .on_click(cx.listener(|this, _, window, cx| this.open_export_dialog(window, cx)))
-                .into_any_element(),
-        };
-        let top = transport(playing, position, duration, &st.song, cx)
-            .child(div().flex_1())
-            .child(export)
-            .child(
-                Button::new("open-new")
-                    .outline()
-                    .label(s.open_new)
-                    .on_click(cx.listener(|this, _, window, cx| this.confirm_open_new(window, cx))),
-            );
 
         let lane = chord_lane(&st.chords, duration, position, cx);
         let rows = self.render_tracks(st, playhead, cx);
@@ -56,7 +31,6 @@ impl AppView {
             .size_full()
             .p_4()
             .gap_3()
-            .child(top)
             .child(lane)
             .child(rows)
     }
@@ -99,6 +73,7 @@ impl AppView {
                 ("track-waveform", i),
                 WaveformProps {
                     peaks: st.peaks[i].clone(),
+                    color: crate::style::stem_color(i),
                     playhead: Some(playhead),
                     selection: None,
                     dimmed: track_gains[i] == 0.0,

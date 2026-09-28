@@ -9,7 +9,6 @@ use gpui_kit::*;
 use crate::app::{AppView, Stage};
 use crate::i18n::{fill, t};
 use crate::timeline::{format_clock, frac_to_secs};
-use crate::views::transport;
 use crate::views::waveform_view::{waveform, WaveformProps};
 
 impl AppView {
@@ -17,27 +16,16 @@ impl AppView {
         let Stage::Trim(st) = &self.stage else { unreachable!() };
         let s = t();
         let duration = st.duration();
-        let (playhead, position, playing) = match &st.player {
-            Ok(p) => (p.position_frac(), p.position_secs(), p.is_playing()),
-            Err(_) => (0.0, 0.0, false),
-        };
+        let playhead = st.player.as_ref().map(|p| p.position_frac()).unwrap_or(0.0);
         let length = frac_to_secs(st.selection.1 - st.selection.0, duration);
         let theme = cx.theme();
-        let (muted_fg, danger) = (theme.muted_foreground, theme.danger);
-
-        let top = transport(playing, position, duration, &st.song, cx)
-            .child(div().flex_1())
-            .child(
-                Button::new("change-file")
-                    .outline()
-                    .label(s.change_file)
-                    .on_click(cx.listener(|this, _, _, cx| this.back_to_empty(cx))),
-            );
+        let (muted_fg, danger, color) = (theme.muted_foreground, theme.danger, theme.primary);
 
         let wave = waveform(
             "trim-waveform",
             WaveformProps {
                 peaks: st.peaks.clone(),
+                color,
                 playhead: Some(playhead),
                 selection: Some(st.selection),
                 dimmed: false,
@@ -69,7 +57,6 @@ impl AppView {
             .size_full()
             .p_4()
             .gap_3()
-            .child(top)
             .child(div().text_sm().text_color(muted_fg).child(s.trim_hint))
             .child(div().h(px(200.)).w_full().child(wave))
             .child(times)

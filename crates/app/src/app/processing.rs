@@ -19,11 +19,19 @@ impl AppView {
     pub fn retry(&mut self, cx: &mut Context<Self>) {
         let Stage::Processing(st) = &self.stage else { return };
         if st.error.is_none() { return; }
-        let (path, song, audio) = (st.path.clone(), st.song.clone(), st.audio.clone());
-        self.begin_processing(path, song, audio, cx);
+        let (path, song, audio, range) = (st.path.clone(), st.song.clone(), st.audio.clone(), st.range);
+        self.begin_processing(path, song, audio, range, cx);
     }
 
-    pub(super) fn begin_processing(&mut self, path: PathBuf, song: String, audio: Arc<StereoAudio>, cx: &mut Context<Self>) {
+    pub(super) fn begin_processing(
+        &mut self,
+        path: PathBuf,
+        song: String,
+        audio: Arc<StereoAudio>,
+        range: (f64, f64),
+        cx: &mut Context<Self>,
+    ) {
+        crate::app_state::set_busy(cx, true);
         let rx = worker::spawn_separation(audio.clone());
         // Replacing the stage drops the trim page's player, which stops playback.
         self.stage = Stage::Processing(ProcessingState {
@@ -35,6 +43,7 @@ impl AppView {
             progress: 0.0,
             error: None,
             rx: Some(rx),
+            range,
         });
         cx.notify();
     }
@@ -55,17 +64,19 @@ impl AppView {
                     changed = true;
                 }
                 Ok(SepMsg::Done(result)) => {
-                    done = Some((st.path.clone(), st.song.clone(), *result));
+                    done = Some((st.path.clone(), st.song.clone(), *result, st.range));
                     break;
                 }
                 Ok(SepMsg::Failed(e)) => {
                     st.error = Some(e);
+                    crate::app_state::set_busy(cx, false);
                     cx.notify();
                     return;
                 }
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => {
                     st.error = Some(t().worker_stopped.to_string());
+                    crate::app_state::set_busy(cx, false);
                     cx.notify();
                     return;
                 }
@@ -74,8 +85,9 @@ impl AppView {
         // The `if let` below returns before using `st` again, so `st`'s borrow
         // of `self.stage` has ended by the time `enter_mixer` runs, letting it
         // take `&mut self` on this path.
-        if let Some((path, song, result)) = done {
-            self.enter_mixer(path, song, result, window, cx);
+        if let Some((path, song, result, range)) = done {
+            crate::app_state::set_busy(cx, false);
+            self.enter_mixer(path, song, result, range, window, cx);
             return;
         }
         st.rx = Some(rx);
@@ -84,7 +96,15 @@ impl AppView {
         }
     }
 
-    pub(super) fn enter_mixer(&mut self, path: PathBuf, song: String, result: Separated, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn enter_mixer(
+        &mut self,
+        path: PathBuf,
+        song: String,
+        result: Separated,
+        range: (f64, f64),
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let stems = Arc::new(result.stems);
         let controls = Arc::new(MixControls::new(stems.len()));
         let mut sliders = Vec::with_capacity(stems.len());
@@ -111,6 +131,7 @@ impl AppView {
             controls,
             player,
             sliders,
+            range,
             _subscriptions: subscriptions,
         });
         self.focus.focus(window, cx);

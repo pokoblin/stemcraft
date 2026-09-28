@@ -11,7 +11,7 @@ use crate::app::{AppView, Stage};
 use crate::i18n::t;
 use crate::worker::{steps, Step};
 
-fn step_label(step: Step) -> &'static str {
+pub(crate) fn step_label(step: Step) -> &'static str {
     let s = t();
     match step {
         Step::LoadModel => s.step_load_model,

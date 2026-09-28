@@ -110,9 +110,10 @@ impl AppView {
             cx.notify();
             return;
         }
+        let range = (timeline::frac_to_secs(st.selection.0, duration), timeline::frac_to_secs(st.selection.1, duration));
         let mut audio = st.source[0].clone();
         audio.trim(timeline::selection_to_range(st.selection, duration));
         let (path, song) = (st.path.clone(), st.song.clone());
-        self.begin_processing(path, song, Arc::new(audio), cx);
+        self.begin_processing(path, song, Arc::new(audio), range, cx);
     }
 }
