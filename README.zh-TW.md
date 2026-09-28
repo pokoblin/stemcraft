@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/icon.png" width="128" height="128" alt="Stemcraft 圖示">
+  <img src="misc/images/icon.png" width="128" height="128" alt="Stemcraft 圖示">
 </p>
 
 <h1 align="center">Stemcraft</h1>
@@ -18,7 +18,7 @@
 [Burn](https://burn.dev) 在 GPU（Metal）上執行，不需要 Python、PyTorch 或 ffmpeg。
 GPUI（[gpui-kit](https://github.com/longbridge/gpui-kit)）桌面 App 與命令列工具共用同一個核心函式庫。
 
-![Stemcraft 混音台（深色主題）](docs/images/screenshot-mixer.png)
+![Stemcraft 混音台（深色主題）](misc/images/screenshot-mixer.png)
 
 ## 目錄結構
 

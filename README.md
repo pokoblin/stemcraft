@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/icon.png" width="128" height="128" alt="Stemcraft icon">
+  <img src="misc/images/icon.png" width="128" height="128" alt="Stemcraft icon">
 </p>
 
 <h1 align="center">Stemcraft</h1>
@@ -21,7 +21,7 @@ Separation runs Demucs `htdemucs_6s` on the GPU (Metal) through
 PyTorch or ffmpeg. The GPUI ([gpui-kit](https://github.com/longbridge/gpui-kit)) desktop app
 reuses the same core crate.
 
-![The Stemcraft mixer in the dark theme](docs/images/screenshot-mixer.png)
+![The Stemcraft mixer in the dark theme](misc/images/screenshot-mixer.png)
 
 ## Layout
 

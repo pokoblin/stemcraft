@@ -7,3 +7,4 @@ samples/
 target/
 output-rs/
 dist/
+.DS_Store
