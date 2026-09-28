@@ -9,7 +9,7 @@ use stemcraft_core::chords::{Chord, NO_CHORD};
 use stemcraft_core::mix::gains;
 
 use crate::app::{AppView, MixerState, Stage};
-use crate::i18n::t;
+use crate::i18n::{fill, t};
 use crate::views::transport;
 use crate::views::waveform_view::{waveform, WaveformProps};
 
@@ -26,8 +26,22 @@ impl AppView {
             Err(_) => (0.0, 0.0, false),
         };
 
+        let export: AnyElement = match &st.export {
+            Some(p) => div()
+                .text_sm()
+                .child(fill(
+                    s.exporting,
+                    &[("done", p.done.to_string().as_str()), ("total", p.total.to_string().as_str())],
+                ))
+                .into_any_element(),
+            None => Button::new("export")
+                .label(s.export)
+                .on_click(cx.listener(|this, _, window, cx| this.open_export_dialog(window, cx)))
+                .into_any_element(),
+        };
         let top = transport(playing, position, duration, &st.song, cx)
             .child(div().flex_1())
+            .child(export)
             .child(
                 Button::new("open-new")
                     .outline()

@@ -1,6 +1,7 @@
 //! Page renderers (as `impl AppView` blocks) and shared pieces.
 
 pub mod empty;
+pub mod export_dialog;
 pub mod mixer;
 pub mod processing;
 pub mod trim;
