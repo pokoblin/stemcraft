@@ -10,6 +10,7 @@ pub struct License {
 pub const LICENSES: &[License] = &[
     License { name: "LAME (libmp3lame)", license: "LGPL-2.0-or-later", text: include_str!("../licenses/lame.txt") },
     License { name: "mp3lame-encoder, mp3lame-sys", license: "LGPL-3.0", text: include_str!("../licenses/lgpl-3.0.txt") },
+    License { name: "GNU GPL v3 (referenced by LGPL-3.0)", license: "GPL-3.0", text: include_str!("../licenses/gpl-3.0.txt") },
     License { name: "libvorbis (aoTuV), vorbis_rs", license: "BSD-3-Clause", text: include_str!("../licenses/libvorbis.txt") },
     License { name: "libogg", license: "BSD-3-Clause", text: include_str!("../licenses/libogg.txt") },
     License { name: "Lucide icons", license: "ISC", text: include_str!("../licenses/lucide.txt") },
@@ -17,6 +18,7 @@ pub const LICENSES: &[License] = &[
     License { name: "Symphonia", license: "MPL-2.0", text: include_str!("../licenses/mpl-2.0.txt") },
     License { name: "Burn, CubeCL", license: "MIT OR Apache-2.0", text: include_str!("../licenses/burn-mit.txt") },
     License { name: "demucs-rs", license: "Apache-2.0", text: include_str!("../licenses/apache-2.0.txt") },
+    License { name: "Demucs (model, Meta Research)", license: "MIT", text: include_str!("../licenses/demucs-mit.txt") },
     License { name: "rubato", license: "MIT OR Apache-2.0", text: include_str!("../licenses/rubato-mit.txt") },
     License { name: "flacenc", license: "Apache-2.0", text: include_str!("../licenses/apache-2.0.txt") },
     License { name: "cpal", license: "Apache-2.0", text: include_str!("../licenses/apache-2.0.txt") },
