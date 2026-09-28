@@ -8,7 +8,7 @@ use mp3lame_encoder::{Bitrate, Builder, DualPcm, FlushGap, Quality};
 
 use crate::audio::StereoAudio;
 
-/// Expects samples in ±1.0 at 32, 44.1 or 48 kHz (see `super::lossy_rate`).
+/// Expects samples in ±1.0 at 32, 44.1 or 48 kHz (see `super::mp3_rate`).
 pub(super) fn write(path: &Path, audio: &StereoAudio) -> Result<()> {
     let mut builder = Builder::new().context("cannot allocate the MP3 encoder")?;
     builder.set_num_channels(2).map_err(|e| anyhow!("mp3 channels: {e}"))?;

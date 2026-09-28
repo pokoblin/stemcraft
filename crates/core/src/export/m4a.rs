@@ -57,7 +57,7 @@ impl Drop for ExtFile {
     }
 }
 
-/// Expects samples in ±1.0 at a rate AAC accepts (see `super::lossy_rate`).
+/// Expects samples in ±1.0 at a rate AAC accepts (see `super::aac_rate`).
 pub(super) fn write(path: &Path, audio: &StereoAudio) -> Result<()> {
     let mut file_format = AudioStreamBasicDescription {
         mSampleRate: audio.sample_rate as f64,

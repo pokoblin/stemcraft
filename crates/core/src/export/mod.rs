@@ -62,16 +62,28 @@ pub fn write(path: &Path, audio: &StereoAudio, format: ExportFormat) -> Result<(
     match format {
         ExportFormat::Wav => write_wav(path, audio),
         ExportFormat::Flac => flac::write(path, audio),
-        ExportFormat::Mp3 => mp3::write(path, &for_lossy(audio)?),
-        ExportFormat::M4a => m4a::write(path, &for_lossy(audio)?),
+        ExportFormat::Mp3 => mp3::write(path, &for_rate(audio, mp3_rate(audio.sample_rate))?),
+        ExportFormat::M4a => m4a::write(path, &for_rate(audio, aac_rate(audio.sample_rate))?),
         ExportFormat::Ogg => ogg::write(path, &clamped(audio)),
     }
 }
 
-/// MP3 and AAC encode 32, 44.1 and 48 kHz directly; other rates are resampled.
-fn lossy_rate(sample_rate: u32) -> u32 {
+/// MP3 encodes 32, 44.1 and 48 kHz directly; other rates are resampled.
+fn mp3_rate(sample_rate: u32) -> u32 {
     match sample_rate {
         32_000 | 44_100 | 48_000 => sample_rate,
+        r if r > 48_000 => 48_000,
+        _ => 44_100,
+    }
+}
+
+/// Apple's AAC encoder only takes 44.1 and 48 kHz directly: 256 kbps CBR at
+/// 32 kHz stereo is rejected outright (`'!dat'`, confirmed with `afconvert
+/// -d aac -b 256000`), so 32 kHz (and anything else that isn't 44.1/48 kHz or
+/// above) is resampled to 44.1 kHz instead of passed through.
+fn aac_rate(sample_rate: u32) -> u32 {
+    match sample_rate {
+        44_100 | 48_000 => sample_rate,
         r if r > 48_000 => 48_000,
         _ => 44_100,
     }
@@ -86,9 +98,10 @@ fn clamped(audio: &StereoAudio) -> StereoAudio {
     }
 }
 
-/// Resample to a rate MP3/AAC accept, then clamp (resampling can overshoot).
-fn for_lossy(audio: &StereoAudio) -> Result<StereoAudio> {
-    Ok(clamped(&resample(audio, lossy_rate(audio.sample_rate))?))
+/// Resample to a rate the target lossy codec accepts, then clamp (resampling
+/// can overshoot).
+fn for_rate(audio: &StereoAudio, rate: u32) -> Result<StereoAudio> {
+    Ok(clamped(&resample(audio, rate)?))
 }
 
 #[cfg(test)]
@@ -186,12 +199,22 @@ mod tests {
     }
 
     #[test]
-    fn lossy_rate_rule() {
-        assert_eq!(lossy_rate(32_000), 32_000);
-        assert_eq!(lossy_rate(44_100), 44_100);
-        assert_eq!(lossy_rate(48_000), 48_000);
-        assert_eq!(lossy_rate(96_000), 48_000);
-        assert_eq!(lossy_rate(22_050), 44_100);
+    fn mp3_rate_rule() {
+        assert_eq!(mp3_rate(32_000), 32_000);
+        assert_eq!(mp3_rate(44_100), 44_100);
+        assert_eq!(mp3_rate(48_000), 48_000);
+        assert_eq!(mp3_rate(96_000), 48_000);
+        assert_eq!(mp3_rate(22_050), 44_100);
+    }
+
+    #[test]
+    fn aac_rate_rule() {
+        // Apple's AAC encoder rejects 256 kbps CBR at 32 kHz stereo, unlike MP3.
+        assert_eq!(aac_rate(32_000), 44_100);
+        assert_eq!(aac_rate(44_100), 44_100);
+        assert_eq!(aac_rate(48_000), 48_000);
+        assert_eq!(aac_rate(96_000), 48_000);
+        assert_eq!(aac_rate(22_050), 44_100);
     }
 
     #[test]
@@ -202,6 +225,17 @@ mod tests {
     #[test]
     fn m4a_roundtrip_48k() {
         roundtrip(ExportFormat::M4a, 48_000, 48_000, 0.08);
+    }
+
+    #[test]
+    fn m4a_roundtrip_32k() {
+        // 32 kHz has no direct AAC rate; it must be resampled to 44.1 kHz.
+        roundtrip(ExportFormat::M4a, 32_000, 44_100, 0.08);
+    }
+
+    #[test]
+    fn m4a_downsamples_high_rates_to_48k() {
+        roundtrip(ExportFormat::M4a, 96_000, 48_000, 0.08);
     }
 
     #[test]
