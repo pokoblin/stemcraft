@@ -103,7 +103,6 @@ pub struct MixerState {
     pub controls: Arc<MixControls>,
     pub player: Result<Player, String>,
     pub sliders: Vec<Entity<SliderState>>,
-    pub export: Option<ExportProgress>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -122,6 +121,9 @@ impl MixerState {
 pub struct AppView {
     focus: FocusHandle,
     pub stage: Stage,
+    /// Export progress, kept here (not in `MixerState`) so it survives a move
+    /// to another stage — e.g. "Open another song" while an export is running.
+    pub export: Option<ExportProgress>,
     was_playing: bool,
     _tick: Task<()>,
     _appearance: Subscription,
@@ -150,6 +152,7 @@ impl AppView {
         Self {
             focus,
             stage: Stage::Empty(EmptyState::default()),
+            export: None,
             was_playing: false,
             _tick: tick,
             _appearance: appearance,
@@ -452,7 +455,6 @@ impl AppView {
             controls,
             player,
             sliders,
-            export: None,
             _subscriptions: subscriptions,
         });
         self.focus.focus(window, cx);
@@ -504,10 +506,10 @@ impl AppView {
     }
 
     pub fn start_export(&mut self, request: ExportRequest, cx: &mut Context<Self>) {
-        let Stage::Mixer(st) = &mut self.stage else { return };
-        if st.export.is_some() {
+        if self.export.is_some() {
             return;
         }
+        let Stage::Mixer(st) = &mut self.stage else { return };
         let ids: Vec<&str> = request.stems.iter().map(|&i| worker::STEM_IDS[i]).collect();
         let plan = naming::plan_export(&request.dest, &st.song, request.format.extension(), &ids, request.chords);
         let job = ExportJob {
@@ -520,7 +522,7 @@ impl AppView {
             title: st.song.clone(),
         };
         let total = job.total();
-        st.export = Some(ExportProgress {
+        self.export = Some(ExportProgress {
             rx: export_job::spawn(job),
             done: 0,
             total,
@@ -528,9 +530,11 @@ impl AppView {
         cx.notify();
     }
 
+    /// Polled every tick regardless of stage, so a stage change (e.g. "Open
+    /// another song") while an export runs doesn't drop its Done/Failed
+    /// notification.
     fn poll_export(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Stage::Mixer(st) = &mut self.stage else { return };
-        let Some(progress) = st.export.as_mut() else { return };
+        let Some(progress) = self.export.as_mut() else { return };
         let finished = loop {
             match progress.rx.try_recv() {
                 Ok(ExportMsg::Progress { done, total }) => {
@@ -544,7 +548,7 @@ impl AppView {
                 Err(mpsc::TryRecvError::Disconnected) => break Err(t().worker_stopped.to_string()),
             }
         };
-        st.export = None;
+        self.export = None;
         match finished {
             Ok(dir) => notify_export_done(dir, window, cx),
             Err(e) => window.push_notification(

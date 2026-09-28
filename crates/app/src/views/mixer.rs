@@ -26,7 +26,7 @@ impl AppView {
             Err(_) => (0.0, 0.0, false),
         };
 
-        let export: AnyElement = match &st.export {
+        let export: AnyElement = match &self.export {
             Some(p) => div()
                 .text_sm()
                 .child(fill(
