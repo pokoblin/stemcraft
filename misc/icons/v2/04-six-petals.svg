@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" color="#4F8CFF" role="img" aria-labelledby="title">
+  <title id="title">Stemcraft · 六轨环绕</title>
+  <g fill="currentColor">
+    <rect x="45" y="17" width="10" height="24" rx="5"/>
+    <rect x="45" y="17" width="10" height="24" rx="5" transform="rotate(60 50 50)"/>
+    <rect x="45" y="17" width="10" height="24" rx="5" transform="rotate(120 50 50)"/>
+    <rect x="45" y="17" width="10" height="24" rx="5" transform="rotate(180 50 50)"/>
+    <rect x="45" y="17" width="10" height="24" rx="5" transform="rotate(240 50 50)"/>
+    <rect x="45" y="17" width="10" height="24" rx="5" transform="rotate(300 50 50)"/>
+  </g>
+</svg>

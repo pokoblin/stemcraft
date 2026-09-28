@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" color="#4F8CFF" role="img" aria-labelledby="title">
+  <title id="title">Stemcraft · 六轨波形</title>
+  <g fill="currentColor">
+    <rect x="14" y="39" width="7" height="22" rx="3.5"/>
+    <rect x="27" y="29" width="7" height="42" rx="3.5"/>
+    <rect x="40" y="18" width="7" height="64" rx="3.5"/>
+    <rect x="53" y="26" width="7" height="48" rx="3.5"/>
+    <rect x="66" y="34" width="7" height="32" rx="3.5"/>
+    <rect x="79" y="41" width="7" height="18" rx="3.5"/>
+  </g>
+</svg>

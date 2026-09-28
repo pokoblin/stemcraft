@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stemcraft · Logo 方案</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #111319;
+      --panel: #1c1f28;
+      --tile: #1c2030;
+      --text: #f0f2f8;
+      --muted: #9ca4b5;
+      --line: #343a48;
+      --accent: #4f8cff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--text); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; transition: background .2s, color .2s; }
+    body.light { color-scheme: light; --page: #f4f4f6; --panel: #fff; --tile: #e7ebf5; --text: #1d1d22; --muted: #646b78; --line: #d8dde8; }
+    a { color: inherit; }
+    button { font: inherit; cursor: pointer; }
+    .wrap { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    header { padding: 52px 0 32px; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { font-size: clamp(38px, 6vw, 70px); line-height: 1; letter-spacing: -.055em; margin: 14px 0; }
+    .intro { color: var(--muted); max-width: 630px; margin: 0; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; align-items: center; }
+    .toolbar button, .toolbar a, .download a { display: inline-block; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 9px 15px; text-decoration: none; font-size: 13px; }
+    .toolbar button:hover, .toolbar a:hover, .download a:hover { border-color: var(--accent); }
+    .hero { display: grid; grid-template-columns: 220px 1fr; gap: 40px; align-items: center; padding: 44px 0; border-bottom: 1px solid var(--line); }
+    .app-tile { width: 220px; aspect-ratio: 1; display: grid; place-items: center; border-radius: 48px; background: #1c2030; box-shadow: 0 24px 60px #0004; }
+    .app-tile img { width: 70%; height: 70%; object-fit: contain; }
+    .hero h2 { font-size: 26px; margin: 0 0 10px; }
+    .hero p { color: var(--muted); max-width: 620px; margin: 0 0 17px; }
+    .section-title { display: flex; justify-content: space-between; gap: 20px; align-items: end; padding: 40px 0 20px; }
+    .section-title h2 { font-size: 26px; letter-spacing: -.03em; margin: 0; }
+    .section-title p { color: var(--muted); margin: 0; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; padding-bottom: 56px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; transition: transform .25s, border-color .25s; }
+    .card:hover { transform: translateY(-4px); }
+    .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .canvas { height: 210px; display: grid; place-items: center; background: var(--tile); }
+    .canvas img { width: 150px; height: 150px; object-fit: contain; }
+    .body { padding: 21px 22px 22px; }
+    .number { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .16em; }
+    .body h3 { font-size: 21px; margin: 6px 0 5px; }
+    .body p { color: var(--muted); font-size: 14px; min-height: 42px; margin: 0 0 18px; }
+    .size-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .size-row span { color: var(--muted); font-size: 11px; margin-right: auto; }
+    .size-row img { width: 32px; height: 32px; object-fit: contain; }
+    .size-row img.small { width: 16px; height: 16px; }
+    .download { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 17px; }
+    .download button { background: var(--accent); color: #0d1732; border: 0; border-radius: 999px; padding: 9px 15px; font-size: 13px; font-weight: 700; }
+    .download button:hover { filter: brightness(1.12); }
+    footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding: 24px 0 42px; }
+    @media (max-width: 880px) { .grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } .hero { grid-template-columns: 1fr; gap: 20px; } .app-tile { width: 180px; border-radius: 38px; } .section-title { display: block; } .section-title p { margin-top: 4px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">Stemcraft / Identity exploration</div>
+      <h1>让音乐的每一轨，清晰可见。</h1>
+      <p class="intro">六个可缩放的单色标记，分别从音轨、分离、波形和混音出发。蓝色沿用软件界面的强调色；点击方案可在应用图标底色上预览。</p>
+      <div class="toolbar">
+        <button id="theme" type="button" aria-label="切换明暗预览">切换明暗预览</button>
+        <a href="logo.svg" download>下载主方案 SVG</a>
+        <a href="app-icon.png" download>下载方形图标 PNG</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero" aria-label="选中方案预览">
+      <div class="app-tile"><img id="hero-mark" src="03-s-ribbon.png" alt="选中方案在深色背景上的预览"></div>
+      <div>
+        <div class="eyebrow">当前预览</div>
+        <h2 id="hero-name">03 · 声波 S</h2>
+        <p id="hero-desc">一笔连续的圆润曲线把 Stemcraft 的首字母和声波流动合在一起。形状简单，适合跨平台应用图标。</p>
+        <div class="eyebrow">主文件：logo.svg · app-icon.svg</div>
+      </div>
+    </section>
+    <div class="section-title"><h2>六个视觉方向</h2><p>每组含可编辑 SVG 与 1024 × 1024 透明 PNG</p></div>
+    <section class="grid" aria-label="Logo 方案列表">
+      <article class="card" data-file="01-six-stems.png" data-name="01 · 六轨波形" data-desc="六根长短不同的圆柱直接对应软件分离出的六条音轨，音乐属性一眼可见。"><div class="canvas"><img src="01-six-stems.svg" alt="六轨波形"></div><div class="body"><div class="number">01 / WAVEFORM</div><h3>六轨波形</h3><p>以六根圆柱表达独立音轨；最直接的音乐识别。</p><div class="size-row"><span>小尺寸预览</span><img class="small" src="01-six-stems.png" alt="16 像素预览"><img src="01-six-stems.png" alt="32 像素预览"></div><div class="download"><button type="button">预览此方案</button><a href="01-six-stems.svg" download>SVG</a><a href="01-six-stems.png" download>PNG</a></div></div></article>
+      <article class="card" data-file="02-branch.png" data-name="02 · 音轨分支" data-desc="一条输入路径自然分为两条输出路径，用极少的线条表现 Stemcraft 的分离能力。"><div class="canvas"><img src="02-branch.svg" alt="音轨分支"></div><div class="body"><div class="number">02 / SPLIT</div><h3>音轨分支</h3><p>一条输入路径分为两条输出，强调音源分离。</p><div class="size-row"><span>小尺寸预览</span><img class="small" src="02-branch.png" alt="16 像素预览"><img src="02-branch.png" alt="32 像素预览"></div><div class="download"><button type="button">预览此方案</button><a href="02-branch.svg" download>SVG</a><a href="02-branch.png" download>PNG</a></div></div></article>
+      <article class="card selected" data-file="03-s-ribbon.png" data-name="03 · 声波 S" data-desc="一笔连续的圆润曲线把 Stemcraft 的首字母和声波流动合在一起。形状简单，适合跨平台应用图标。"><div class="canvas"><img src="03-s-ribbon.svg" alt="声波 S"></div><div class="body"><div class="number">03 / PRIMARY</div><h3>声波 S</h3><p>首字母与声波合一，是当前推荐的主标记。</p><div class="size-row"><span>小尺寸预览</span><img class="small" src="03-s-ribbon.png" alt="16 像素预览"><img src="03-s-ribbon.png" alt="32 像素预览"></div><div class="download"><button type="button">预览此方案</button><a href="03-s-ribbon.svg" download>SVG</a><a href="03-s-ribbon.png" download>PNG</a></div></div></article>
+      <article class="card" data-file="04-six-petals.png" data-name="04 · 六轨环绕" data-desc="六个独立的圆角单元围绕同一个中心，表现分轨之后仍可重新组合。"><div class="canvas"><img src="04-six-petals.svg" alt="六轨环绕"></div><div class="body"><div class="number">04 / MODULAR</div><h3>六轨环绕</h3><p>六个单元围绕空心中心，表达独立与组合。</p><div class="size-row"><span>小尺寸预览</span><img class="small" src="04-six-petals.png" alt="16 像素预览"><img src="04-six-petals.png" alt="32 像素预览"></div><div class="download"><button type="button">预览此方案</button><a href="04-six-petals.svg" download>SVG</a><a href="04-six-petals.png" download>PNG</a></div></div></article>
+      <article class="card" data-file="05-open-track.png" data-name="05 · 开放音轨" data-desc="开放的唱片轮廓与向外延伸的信号结合，突出提取和导出的动作。"><div class="canvas"><img src="05-open-track.svg" alt="开放音轨"></div><div class="body"><div class="number">05 / EXTRACT</div><h3>开放音轨</h3><p>唱片轮廓向外打开，暗示提取并导出音轨。</p><div class="size-row"><span>小尺寸预览</span><img class="small" src="05-open-track.png" alt="16 像素预览"><img src="05-open-track.png" alt="32 像素预览"></div><div class="download"><button type="button">预览此方案</button><a href="05-open-track.svg" download>SVG</a><a href="05-open-track.png" download>PNG</a></div></div></article>
+      <article class="card" data-file="06-dual-wave.png" data-name="06 · 双轨混音" data-desc="两道波形交错通过，表达分离之后的混音试听，形态最具动感。"><div class="canvas"><img src="06-dual-wave.svg" alt="双轨混音"></div><div class="body"><div class="number">06 / MIX</div><h3>双轨混音</h3><p>两道波形交错，强调试听、平衡与再混合。</p><div class="size-row"><span>小尺寸预览</span><img class="small" src="06-dual-wave.png" alt="16 像素预览"><img src="06-dual-wave.png" alt="32 像素预览"></div><div class="download"><button type="button">预览此方案</button><a href="06-dual-wave.svg" download>SVG</a><a href="06-dual-wave.png" download>PNG</a></div></div></article>
+    </section>
+  </main>
+  <footer><div class="wrap">Stemcraft · Logo 探索 · SVG 为矢量源文件，PNG 为预览和通用位图源文件。</div></footer>
+  <script>
+    document.getElementById('theme').addEventListener('click', () => document.body.classList.toggle('light'));
+    document.querySelectorAll('.card .download button').forEach(button => button.addEventListener('click', () => {
+      const card = button.closest('.card');
+      document.querySelectorAll('.card').forEach(item => item.classList.toggle('selected', item === card));
+      document.getElementById('hero-mark').src = card.dataset.file;
+      document.getElementById('hero-name').textContent = card.dataset.name;
+      document.getElementById('hero-desc').textContent = card.dataset.desc;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
+  </script>
+</body>
+</html>
