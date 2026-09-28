@@ -35,6 +35,14 @@ fn local_path() -> Option<PathBuf> {
     find_local(exe.as_deref(), cache.as_deref())
 }
 
+/// True when the weights ship inside the app bundle (not the download cache).
+pub fn is_bundled() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| bundled_path_for(&exe))
+        .is_some_and(|p| p.is_file())
+}
+
 /// True when no download is needed (bundled or cached).
 pub fn is_cached() -> bool {
     local_path().is_some()
