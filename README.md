@@ -80,3 +80,9 @@ The first run downloads the model weights (~55 MB, Hugging Face) into
 ```bash
 cargo test
 ```
+
+## License
+
+Stemcraft is released under the [MIT License](LICENSE). Bundled third-party components — LAME,
+libvorbis, gpui and others — keep their own licenses, listed in the app
+under Settings → About.

@@ -72,3 +72,8 @@ M4A（AAC/ALAC），單聲道或立體聲。輸出為 32 位元浮點 WAV，取�
 ```bash
 cargo test
 ```
+
+## 授權
+
+Stemcraft 以 [MIT 授權](LICENSE) 發佈。打包進 App 的第三方元件（LAME、libvorbis、gpui 等）
+沿用各自的授權條款，可以在 App 的「設定 → 關於」中查看。
