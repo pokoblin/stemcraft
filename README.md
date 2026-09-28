@@ -4,14 +4,14 @@ Split a song into six stems — drums, bass, vocals, piano, other, guitar — th
 you want and export them as a new mix. Inspired by
 [Haig012/guitar-extractor](https://github.com/Haig012/guitar-extractor), rewritten in Rust.
 
-The CLI currently produces an **isolated guitar** track and a **guitar-free backing** track
-(plus all raw stems and an optional timed chord sheet); free stem selection comes with the
-desktop app.
+Both a CLI and a macOS desktop app are included. The desktop app separates a song (or a part
+of it), lets you mute / solo / balance the six stems while listening, and exports the mix — and
+optionally each stem and a chord chart — as WAV, FLAC, MP3, M4A (AAC) or OGG.
 
 Separation runs Demucs `htdemucs_6s` on the GPU (Metal) through
 [demucs-rs](https://github.com/nikhilunni/demucs-rs) / [Burn](https://burn.dev) — no Python,
-PyTorch or ffmpeg. A GPUI ([gpui-kit](https://github.com/longbridge/gpui-kit)) desktop app will
-reuse the same core crate.
+PyTorch or ffmpeg. The GPUI ([gpui-kit](https://github.com/longbridge/gpui-kit)) desktop app
+reuses the same core crate.
 
 ## Layout
 
@@ -19,6 +19,7 @@ reuse the same core crate.
 |---|---|
 | `crates/core` | Library: decoding (Symphonia), separation, guitar/backing mixdown, chord detection, weights cache |
 | `crates/cli` | `stemcraft` command-line tool |
+| `crates/app` | `stemcraft-app` desktop app (GPUI) |
 | `misc/python_src` | Earlier Python prototype (demucs-mlx), kept for reference |
 
 ## Build
@@ -28,6 +29,17 @@ Requires Rust 1.98.1 (pinned in `rust-toolchain.toml`; rustup installs it automa
 ```bash
 cargo build --release
 ```
+
+## Desktop app
+
+```bash
+cargo run --release -p stemcraft-app      # run from source
+script/bundle-macos.sh                    # → dist/Stemcraft.app and dist/Stemcraft.dmg
+```
+
+The bundled app carries the model weights in `Contents/Resources/`, so it works offline with
+nothing else to install. It is ad-hoc signed: on another Mac, right-click → Open the first time
+(distributing to others needs a Developer ID signature and notarization).
 
 ## Usage
 
