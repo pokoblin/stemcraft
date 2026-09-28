@@ -43,6 +43,10 @@ open System Settings → Privacy & Security and click "Open Anyway" (on macOS ve
 right-click → Open also works). Distributing to others needs a Developer ID signature and
 notarization.
 
+Settings (Stemcraft → Settings…, ⌘,) cover language, appearance (follow system / light / dark),
+the export location and defaults, the audio output device, the GPU optimization cache and
+third-party licenses. They're saved to `~/Library/Application Support/Stemcraft/settings.json`.
+
 ## Usage
 
 ```bash
