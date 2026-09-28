@@ -1,4 +1,12 @@
-# Stemcraft
+<p align="center">
+  <img src="docs/images/icon.png" width="128" height="128" alt="Stemcraft icon">
+</p>
+
+<h1 align="center">Stemcraft</h1>
+
+<p align="center">
+  <b>English</b> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a>
+</p>
 
 Split a song into six stems — drums, bass, vocals, piano, other, guitar — then pick the ones
 you want and export them as a new mix. Inspired by
@@ -12,6 +20,8 @@ Separation runs Demucs `htdemucs_6s` on the GPU (Metal) through
 [demucs-rs](https://github.com/nikhilunni/demucs-rs) / [Burn](https://burn.dev) — no Python,
 PyTorch or ffmpeg. The GPUI ([gpui-kit](https://github.com/longbridge/gpui-kit)) desktop app
 reuses the same core crate.
+
+![The Stemcraft mixer in the dark theme](docs/images/screenshot-mixer.png)
 
 ## Layout
 
@@ -43,11 +53,12 @@ open System Settings → Privacy & Security and click "Open Anyway" (on macOS ve
 right-click → Open also works). Distributing to others needs a Developer ID signature and
 notarization.
 
-Settings (Stemcraft → Settings…, ⌘,) cover language, appearance (follow system / light / dark),
+Settings (Stemcraft → Settings…, ⌘,) cover language (English, Simplified Chinese or Traditional
+Chinese; follows the system by default), appearance (follow system / light / dark),
 the export location and defaults, the audio output device, the GPU optimization cache and
 third-party licenses. They're saved to `~/Library/Application Support/Stemcraft/settings.json`.
 
-## Usage
+## Command-line usage
 
 ```bash
 stemcraft song.mp3                 # → output/song/song_guitar.wav, song_no_guitar.wav
