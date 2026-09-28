@@ -1,7 +1,8 @@
-//! UI copy in English and Simplified Chinese, picked from the system's first
-//! preferred language.
+//! UI copy in English and Simplified Chinese; switchable at runtime.
 
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU8, Ordering};
+
+use crate::settings::Language;
 
 pub struct Strings {
     pub drop_hint: &'static str,
@@ -55,6 +56,62 @@ pub struct Strings {
     pub export_failed: &'static str,
     pub reveal: &'static str,
     pub quit: &'static str,
+    pub back_to_start: &'static str,
+    pub open_short: &'static str,
+    pub settings_tooltip: &'static str,
+    pub settings_menu: &'static str,
+    /// `{rate}`
+    pub stereo_rate: &'static str,
+    /// `{start}`, `{end}`
+    pub range: &'static str,
+    pub tracks_label: &'static str,
+    pub system_default_device: &'static str,
+    pub device_fallback: &'static str,
+    /// `{name}`
+    pub unavailable: &'static str,
+    pub export_busy: &'static str,
+    pub export_contents: &'static str,
+    pub export_dir_fallback: &'static str,
+    pub settings_save_failed: &'static str,
+    pub settings_title: &'static str,
+    pub page_general: &'static str,
+    pub page_export: &'static str,
+    pub page_audio: &'static str,
+    pub page_storage: &'static str,
+    pub page_about: &'static str,
+    pub language_label: &'static str,
+    pub follow_system: &'static str,
+    pub appearance_label: &'static str,
+    pub light: &'static str,
+    pub dark: &'static str,
+    pub export_location: &'static str,
+    pub location_same: &'static str,
+    pub location_folder: &'static str,
+    pub location_desc: &'static str,
+    pub folder_label: &'static str,
+    pub choose: &'static str,
+    pub default_format: &'static str,
+    pub defaults_desc: &'static str,
+    pub default_stems: &'static str,
+    pub default_chords: &'static str,
+    pub output_device: &'static str,
+    pub output_device_desc: &'static str,
+    pub gpu_cache: &'static str,
+    pub gpu_cache_desc: &'static str,
+    pub clear: &'static str,
+    pub clear_confirm_title: &'static str,
+    pub clear_confirm_body: &'static str,
+    pub clear_busy: &'static str,
+    pub cache_cleared: &'static str,
+    pub clear_failed: &'static str,
+    pub model_label: &'static str,
+    pub model_bundled: &'static str,
+    pub model_cached: &'static str,
+    pub tagline: &'static str,
+    pub version_label: &'static str,
+    pub model_source: &'static str,
+    pub model_source_value: &'static str,
+    pub licenses: &'static str,
 }
 
 pub static EN: Strings = Strings {
@@ -105,6 +162,59 @@ pub static EN: Strings = Strings {
     export_failed: "Export failed",
     reveal: "Show in Finder",
     quit: "Quit Stemcraft",
+    back_to_start: "Back to start",
+    open_short: "Open",
+    settings_tooltip: "Settings (⌘,)",
+    settings_menu: "Settings…",
+    stereo_rate: "{rate} kHz · Stereo",
+    range: "Selection {start} – {end}",
+    tracks_label: "Tracks",
+    system_default_device: "System default",
+    device_fallback: "The chosen output device isn't available, so the system default is used.",
+    unavailable: "{name} (unavailable)",
+    export_busy: "An export is already running.",
+    export_contents: "Contents",
+    export_dir_fallback: "The export folder no longer exists, so the song's folder is used.",
+    settings_save_failed: "Couldn't save settings",
+    settings_title: "Settings",
+    page_general: "General",
+    page_export: "Export",
+    page_audio: "Audio",
+    page_storage: "Storage",
+    page_about: "About",
+    language_label: "Language",
+    follow_system: "Follow system",
+    appearance_label: "Appearance",
+    light: "Light",
+    dark: "Dark",
+    export_location: "Export location",
+    location_same: "Same folder as the song",
+    location_folder: "Custom folder",
+    location_desc: "You can still pick another folder when exporting.",
+    folder_label: "Folder",
+    choose: "Choose…",
+    default_format: "Default format",
+    defaults_desc: "Pre-selected in the export dialog.",
+    default_stems: "Also export individual stems",
+    default_chords: "Export the chord chart",
+    output_device: "Output device",
+    output_device_desc: "Used for listening. Stemcraft never changes the device's sample rate.",
+    gpu_cache: "GPU optimization cache",
+    gpu_cache_desc: "After clearing, the next split re-optimizes for your GPU. The folder is shared with other apps built on the same GPU library.",
+    clear: "Clear",
+    clear_confirm_title: "Clear the GPU optimization cache?",
+    clear_confirm_body: "The next split takes a minute or two longer while it re-optimizes.",
+    clear_busy: "Can't clear the cache while a song is being split.",
+    cache_cleared: "Cache cleared",
+    clear_failed: "Couldn't clear the cache",
+    model_label: "Model",
+    model_bundled: "htdemucs_6s, built into the app",
+    model_cached: "htdemucs_6s, in the download cache",
+    tagline: "Split a song into six stems, mix them, and export.",
+    version_label: "Version",
+    model_source: "Model source",
+    model_source_value: "Demucs by Meta Research, MIT license. No separate license is stated for the model weights.",
+    licenses: "Third-party licenses",
 };
 
 pub static ZH: Strings = Strings {
@@ -155,21 +265,89 @@ pub static ZH: Strings = Strings {
     export_failed: "导出失败",
     reveal: "在访达中显示",
     quit: "退出 Stemcraft",
+    back_to_start: "回到开头",
+    open_short: "打开",
+    settings_tooltip: "设置（⌘,）",
+    settings_menu: "设置…",
+    stereo_rate: "{rate} kHz · 立体声",
+    range: "选段 {start} – {end}",
+    tracks_label: "音轨",
+    system_default_device: "系统默认",
+    device_fallback: "所选的输出设备不可用，已改用系统默认设备。",
+    unavailable: "{name}（不可用）",
+    export_busy: "已有导出正在进行。",
+    export_contents: "内容",
+    export_dir_fallback: "指定的导出文件夹已不存在，改用原曲所在的文件夹。",
+    settings_save_failed: "无法保存设置",
+    settings_title: "设置",
+    page_general: "通用",
+    page_export: "导出",
+    page_audio: "音频",
+    page_storage: "存储",
+    page_about: "关于",
+    language_label: "语言",
+    follow_system: "跟随系统",
+    appearance_label: "外观",
+    light: "浅色",
+    dark: "深色",
+    export_location: "导出位置",
+    location_same: "与原曲相同的文件夹",
+    location_folder: "指定文件夹",
+    location_desc: "导出时仍可临时选择其他文件夹。",
+    folder_label: "文件夹",
+    choose: "选择…",
+    default_format: "默认格式",
+    defaults_desc: "导出对话框会预先选好这些。",
+    default_stems: "同时导出单轨",
+    default_chords: "导出和弦谱",
+    output_device: "输出设备",
+    output_device_desc: "用于试听。Stemcraft 不会改动设备的采样率。",
+    gpu_cache: "GPU 优化缓存",
+    gpu_cache_desc: "清除后，下次分离会重新优化 GPU。这个文件夹与使用同一 GPU 库的其他应用共用。",
+    clear: "清除",
+    clear_confirm_title: "清除 GPU 优化缓存？",
+    clear_confirm_body: "下次分离会多花一两分钟重新优化。",
+    clear_busy: "正在分离歌曲，暂时不能清除缓存。",
+    cache_cleared: "缓存已清除",
+    clear_failed: "无法清除缓存",
+    model_label: "模型",
+    model_bundled: "htdemucs_6s，内置于应用",
+    model_cached: "htdemucs_6s，位于下载缓存",
+    tagline: "把歌曲分离成六条音轨，混音后导出。",
+    version_label: "版本",
+    model_source: "模型来源",
+    model_source_value: "Demucs（Meta Research），MIT 许可。上游未单独声明模型权重的许可。",
+    licenses: "第三方许可",
 };
 
-static CURRENT: OnceLock<&'static Strings> = OnceLock::new();
+/// 0 = English, 1 = Chinese.
+static CURRENT: AtomicU8 = AtomicU8::new(0);
 
 pub fn is_chinese(locale: Option<&str>) -> bool {
     locale.is_some_and(|l| l.to_ascii_lowercase().starts_with("zh"))
 }
 
-/// Pick the language once at startup (`sys_locale::get_locale()`).
-pub fn init(locale: Option<&str>) {
-    let _ = CURRENT.set(if is_chinese(locale) { &ZH } else { &EN });
+/// The strings a language setting resolves to; `System` follows the OS's
+/// first preferred language.
+pub fn resolve(language: Language, system_locale: Option<&str>) -> &'static Strings {
+    match language {
+        Language::ZhHans => &ZH,
+        Language::English => &EN,
+        Language::System if is_chinese(system_locale) => &ZH,
+        Language::System => &EN,
+    }
+}
+
+/// Switch the UI language. Returns gpui-kit's locale code, so its built-in
+/// strings can follow.
+pub fn set_language(language: Language, system_locale: Option<&str>) -> &'static str {
+    let chinese = std::ptr::eq(resolve(language, system_locale), &ZH);
+    CURRENT.store(u8::from(chinese), Ordering::Relaxed);
+    if chinese { "zh-CN" } else { "en" }
 }
 
 pub fn t() -> &'static Strings {
-    CURRENT.get().copied().unwrap_or(&EN)
+    if CURRENT.load(Ordering::Relaxed) == 1 { &ZH } else { &EN }
 }
 
 /// Replace `{key}` placeholders.
@@ -205,5 +383,24 @@ mod tests {
     fn chinese_reason_separator_is_full_width() {
         assert_eq!(ZH.reason_sep, "：");
         assert_eq!(EN.reason_sep, ": ");
+    }
+
+    #[test]
+    fn resolves_languages() {
+        use crate::settings::Language;
+        assert!(std::ptr::eq(resolve(Language::ZhHans, Some("en-US")), &ZH));
+        assert!(std::ptr::eq(resolve(Language::English, Some("zh-CN")), &EN));
+        assert!(std::ptr::eq(resolve(Language::System, Some("zh-Hans-JP")), &ZH));
+        assert!(std::ptr::eq(resolve(Language::System, Some("en-JP")), &EN));
+        assert!(std::ptr::eq(resolve(Language::System, None), &EN));
+    }
+
+    #[test]
+    fn set_language_switches_strings_and_reports_locale() {
+        use crate::settings::Language;
+        assert_eq!(set_language(Language::ZhHans, None), "zh-CN");
+        assert_eq!(t().play, "播放");
+        assert_eq!(set_language(Language::English, None), "en");
+        assert_eq!(t().play, "Play");
     }
 }

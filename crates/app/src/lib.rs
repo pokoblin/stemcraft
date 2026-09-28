@@ -18,7 +18,7 @@ use gpui_kit::*;
 actions!(stemcraft, [Quit]);
 
 pub fn run() {
-    i18n::init(sys_locale::get_locale().as_deref());
+    i18n::set_language(settings::Language::System, sys_locale::get_locale().as_deref());
     gpui_kit::application()
         // Icons (checkbox tick, notification close, …) need the asset bundle.
         .with_assets(gpui_kit::assets::Assets)
