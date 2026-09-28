@@ -3,7 +3,7 @@
 
 use gpui_kit::assets::IconName as Lucide;
 use gpui_kit::component::accordion::Accordion;
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariant};
 use gpui_kit::component::dialog::DialogButtonProps;
 use gpui_kit::component::label::Label;
 use gpui_kit::component::notification::Notification;
@@ -331,7 +331,7 @@ fn audio_page(cx: &App, devices: &[DeviceInfo]) -> SettingPage {
         .group(SettingGroup::new().item(
             SettingItem::new(
                 s.output_device,
-                SettingField::dropdown(
+                SettingField::scrollable_dropdown(
                     options,
                     |cx: &App| AppSettings::get(cx).output_device_id().unwrap_or("").to_string().into(),
                     move |value: SharedString, cx: &mut App| {
@@ -396,13 +396,15 @@ fn confirm_clear_cache(window: &mut Window, cx: &mut App, view: WeakEntity<Setti
         let view = view.clone();
         let s = t();
         alert
-            .confirm()
             .title(s.clear_confirm_title)
             .description(s.clear_confirm_body)
-            // button_props replaces all props (show_cancel too), so set it first.
+            // button_props replaces all props (including show_cancel), so
+            // every one that's wanted (cancel, and a destructive OK) is set
+            // here explicitly.
             .button_props(
                 DialogButtonProps::default()
                     .ok_text(s.clear)
+                    .ok_variant(ButtonVariant::Danger)
                     .cancel_text(s.cancel)
                     .show_cancel(true),
             )

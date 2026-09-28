@@ -52,9 +52,12 @@ pub fn title_bar(
                         .flex()
                         .items_center()
                         .justify_center()
+                        // Clears the side button groups at the 900px minimum
+                        // window width so a long title never overlaps them.
+                        .px(px(260.))
                         .text_sm()
                         .text_color(theme.muted_foreground)
-                        .child(center.into()),
+                        .child(div().flex_1().min_w_0().text_center().truncate().child(center.into())),
                 )
                 .child(
                     h_flex()
