@@ -39,6 +39,14 @@ pub fn clear_gpu_cache() -> Result<()> {
     remove_dir(&gpu_cache_dir())
 }
 
+/// True once this process has set up the GPU (via [`Separator::new`]).
+/// Deleting the cache folder after that point can make cubecl re-tune from
+/// scratch mid-session or spin forever locking a now-deleted folder, so
+/// callers should defer the clear instead.
+pub fn gpu_initialized() -> bool {
+    GPU_INIT.is_completed()
+}
+
 fn dir_size(dir: &Path) -> u64 {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return 0;

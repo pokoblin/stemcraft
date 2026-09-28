@@ -408,7 +408,14 @@ fn confirm_clear_cache(window: &mut Window, cx: &mut App, view: WeakEntity<Setti
             )
             .on_ok(move |_, window, cx| {
                 // Check again: a split may have started since the dialog opened.
-                let note = if app_state::is_busy(cx) {
+                let note = if separation::gpu_initialized() {
+                    // The GPU is already in use this session: deleting the
+                    // folder now could make cubecl re-tune mid-session or
+                    // spin forever relocking a folder that's gone. Defer the
+                    // clear to the next launch instead.
+                    AppSettings::update(cx, |s| s.clear_gpu_cache_on_launch = true);
+                    Notification::info(t().cache_clear_on_restart)
+                } else if app_state::is_busy(cx) {
                     Notification::warning(t().clear_busy)
                 } else {
                     match separation::clear_gpu_cache() {

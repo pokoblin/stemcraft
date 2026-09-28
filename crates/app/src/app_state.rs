@@ -53,7 +53,20 @@ impl Global for Busy {}
 
 pub fn init(cx: &mut App) {
     let path = Settings::default_path();
-    let settings = path.as_deref().map(Settings::load_from).unwrap_or_default();
+    let mut settings = path.as_deref().map(Settings::load_from).unwrap_or_default();
+    // A clear requested last session while the GPU was already in use was
+    // deferred to here, before anything touches the GPU this session.
+    if settings.clear_gpu_cache_on_launch {
+        if let Err(e) = stemcraft_core::separation::clear_gpu_cache() {
+            eprintln!("couldn't clear the deferred GPU cache: {e:#}");
+        }
+        settings.clear_gpu_cache_on_launch = false;
+        if let Some(path) = &path
+            && let Err(e) = settings.save_to(path)
+        {
+            eprintln!("couldn't save settings after clearing the deferred GPU cache: {e:#}");
+        }
+    }
     cx.set_global(AppSettings { settings, path, save_error: None });
     cx.set_global(Busy::default());
 }

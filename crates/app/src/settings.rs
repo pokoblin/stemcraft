@@ -53,6 +53,10 @@ pub struct Settings {
     pub export_chords: bool,
     /// `None` follows the system default output.
     pub output_device: Option<OutputDevice>,
+    /// Set when a cache clear was requested while the GPU was already
+    /// initialised this session; the clear happens at the next launch
+    /// instead, before any GPU use.
+    pub clear_gpu_cache_on_launch: bool,
 }
 
 impl Default for Settings {
@@ -65,6 +69,7 @@ impl Default for Settings {
             export_stems: false,
             export_chords: false,
             output_device: None,
+            clear_gpu_cache_on_launch: false,
         }
     }
 }
@@ -156,6 +161,7 @@ mod tests {
         assert_eq!(s.format(), ExportFormat::Flac);
         assert!(!s.export_stems && !s.export_chords);
         assert_eq!(s.output_device_id(), None);
+        assert!(!s.clear_gpu_cache_on_launch);
     }
 
     #[test]
@@ -170,6 +176,7 @@ mod tests {
             export_stems: true,
             export_chords: true,
             output_device: Some(OutputDevice { id: "coreaudio:X".into(), name: "Speakers".into() }),
+            clear_gpu_cache_on_launch: true,
         };
         s.save_to(&path).unwrap();
         assert_eq!(Settings::load_from(&path), s);
