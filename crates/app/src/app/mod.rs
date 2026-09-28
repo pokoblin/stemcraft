@@ -350,7 +350,7 @@ impl Render for AppView {
         let notification_layer = Root::render_notification_layer(window, cx);
         let body = match &self.stage {
             Stage::Empty(_) => self.render_empty(cx).into_any_element(),
-            Stage::Trim(_) => self.render_trim(cx).into_any_element(),
+            Stage::Trim(_) => self.render_trim(window, cx).into_any_element(),
             Stage::Processing(_) => self.render_processing(cx).into_any_element(),
             Stage::Mixer(_) => self.render_mixer(cx).into_any_element(),
         };
