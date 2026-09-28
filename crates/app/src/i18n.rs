@@ -1,4 +1,5 @@
-//! UI copy in English and Simplified Chinese; switchable at runtime.
+//! UI copy in English, Simplified Chinese and Traditional Chinese (Taiwan
+//! wording); switchable at runtime.
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -323,11 +324,131 @@ pub static ZH: Strings = Strings {
     licenses: "第三方许可",
 };
 
-/// 0 = English, 1 = Chinese.
+/// Traditional Chinese, Taiwan wording.
+pub static ZH_TW: Strings = Strings {
+    drop_hint: "把歌曲拖到這裡",
+    choose_file: "選擇檔案…",
+    supported_formats: "支援 WAV、AIFF、FLAC、MP3、OGG、M4A",
+    reading: "正在讀取…",
+    unsupported_file: "不支援這種檔案。選擇 WAV、AIFF、FLAC、MP3、OGG 或 M4A 檔案。",
+    open_failed: "無法讀取這個檔案",
+    reason_sep: "：",
+    worker_stopped: "背景工作意外中止",
+    play: "播放",
+    pause: "暫停",
+    change_file: "換一個檔案",
+    trim_hint: "在波形上拖曳，選取要分離的片段；預設為整首。",
+    start_label: "開始",
+    end_label: "結束",
+    selected_length: "已選取 {len}",
+    bad_time: "時間格式應為 分:秒，例如 1:30",
+    too_short: "選取範圍至少要 1 秒",
+    start_separation: "開始分離",
+    processing_title: "正在分離",
+    step_load_model: "載入模型",
+    step_warmup: "最佳化 GPU（僅首次，需要一兩分鐘）",
+    step_separate: "分離音軌",
+    step_chords: "辨識和弦",
+    failed_title: "分離失敗",
+    retry: "重試",
+    open_new: "開啟新檔案",
+    confirm_discard_title: "開啟新檔案？",
+    confirm_discard_body: "目前的分離結果會被捨棄。如需保留，先匯出。",
+    confirm_open: "開啟",
+    cancel: "取消",
+    chords_label: "和弦",
+    no_audio_device: "無法播放",
+    stems: ["鼓", "貝斯", "人聲", "鋼琴", "吉他", "其他"],
+    export: "匯出…",
+    export_title: "匯出",
+    format_label: "格式",
+    mix_label: "混音（與試聽一致）",
+    also_stems: "同時匯出單軌",
+    chord_chart: "和弦譜（.lrc 和 .txt）",
+    save_to: "儲存至",
+    change_folder: "更改…",
+    export_button: "匯出",
+    exporting: "正在匯出 {done}/{total}",
+    export_done: "匯出完成",
+    export_failed: "匯出失敗",
+    reveal: "在 Finder 中顯示",
+    quit: "結束 Stemcraft",
+    back_to_start: "回到開頭",
+    open_short: "開啟",
+    settings_tooltip: "設定（⌘,）",
+    settings_menu: "設定…",
+    stereo_rate: "{rate} kHz · 立體聲",
+    range: "選取範圍 {start} – {end}",
+    tracks_label: "音軌",
+    system_default_device: "系統預設",
+    device_fallback: "所選的輸出裝置無法使用，已改用系統預設裝置。",
+    unavailable: "{name}（無法使用）",
+    export_busy: "已有匯出正在進行。",
+    export_contents: "內容",
+    export_dir_fallback: "指定的匯出資料夾已不存在，改用原曲所在的資料夾。",
+    settings_save_failed: "無法儲存設定",
+    settings_title: "設定",
+    page_general: "一般",
+    page_export: "匯出",
+    page_audio: "音訊",
+    page_storage: "儲存空間",
+    page_about: "關於",
+    language_label: "語言",
+    follow_system: "跟隨系統",
+    appearance_label: "外觀",
+    light: "淺色",
+    dark: "深色",
+    export_location: "匯出位置",
+    location_same: "與原曲相同的資料夾",
+    location_folder: "指定資料夾",
+    location_desc: "匯出時仍可臨時選擇其他資料夾。",
+    folder_label: "資料夾",
+    choose: "選擇…",
+    default_format: "預設格式",
+    defaults_desc: "匯出對話框會預先選好這些。",
+    default_stems: "同時匯出單軌",
+    default_chords: "匯出和弦譜",
+    output_device: "輸出裝置",
+    output_device_desc: "用於試聽。Stemcraft 不會變更裝置的取樣率。",
+    gpu_cache: "GPU 最佳化快取",
+    gpu_cache_desc: "清除後，下次分離會重新最佳化 GPU。這個資料夾與使用同一 GPU 函式庫的其他 App 共用。",
+    clear: "清除",
+    clear_confirm_title: "清除 GPU 最佳化快取？",
+    clear_confirm_body: "下次分離會多花一兩分鐘重新最佳化。",
+    cache_clear_on_restart: "快取會在下次啟動 Stemcraft 時清除。",
+    clear_busy: "正在分離歌曲，暫時無法清除快取。",
+    cache_cleared: "快取已清除",
+    clear_failed: "無法清除快取",
+    model_label: "模型",
+    model_bundled: "htdemucs_6s，內建於 App",
+    model_cached: "htdemucs_6s，位於下載快取",
+    tagline: "將歌曲分離成六條音軌，混音後匯出。",
+    version_label: "版本",
+    model_source: "模型來源",
+    model_source_value: "Demucs（Meta Research），MIT 授權。上游未另外聲明模型權重的授權。",
+    licenses: "第三方授權",
+};
+
+/// 0 = English, 1 = Simplified Chinese, 2 = Traditional Chinese.
 static CURRENT: AtomicU8 = AtomicU8::new(0);
 
 pub fn is_chinese(locale: Option<&str>) -> bool {
     locale.is_some_and(|l| l.to_ascii_lowercase().starts_with("zh"))
+}
+
+/// A Chinese locale written in Traditional characters: an explicit `Hant`
+/// script, or — with no script given — the TW, HK or MO region. An explicit
+/// `Hans` script wins over the region (`zh-Hans-TW` is Simplified).
+fn is_traditional(locale: &str) -> bool {
+    let lower = locale.to_ascii_lowercase().replace('_', "-");
+    let parts: Vec<&str> = lower.split('-').collect();
+    if parts.contains(&"hant") {
+        return true;
+    }
+    if parts.contains(&"hans") {
+        return false;
+    }
+    parts.iter().skip(1).any(|p| matches!(*p, "tw" | "hk" | "mo"))
 }
 
 /// The strings a language setting resolves to; `System` follows the OS's
@@ -335,22 +456,37 @@ pub fn is_chinese(locale: Option<&str>) -> bool {
 pub fn resolve(language: Language, system_locale: Option<&str>) -> &'static Strings {
     match language {
         Language::ZhHans => &ZH,
+        Language::ZhHant => &ZH_TW,
         Language::English => &EN,
-        Language::System if is_chinese(system_locale) => &ZH,
-        Language::System => &EN,
+        Language::System => match system_locale {
+            Some(locale) if is_chinese(Some(locale)) && is_traditional(locale) => &ZH_TW,
+            Some(locale) if is_chinese(Some(locale)) => &ZH,
+            _ => &EN,
+        },
     }
 }
 
 /// Switch the UI language. Returns gpui-kit's locale code, so its built-in
 /// strings can follow.
 pub fn set_language(language: Language, system_locale: Option<&str>) -> &'static str {
-    let chinese = std::ptr::eq(resolve(language, system_locale), &ZH);
-    CURRENT.store(u8::from(chinese), Ordering::Relaxed);
-    if chinese { "zh-CN" } else { "en" }
+    let strings = resolve(language, system_locale);
+    let (index, locale) = if std::ptr::eq(strings, &ZH) {
+        (1, "zh-CN")
+    } else if std::ptr::eq(strings, &ZH_TW) {
+        (2, "zh-TW")
+    } else {
+        (0, "en")
+    };
+    CURRENT.store(index, Ordering::Relaxed);
+    locale
 }
 
 pub fn t() -> &'static Strings {
-    if CURRENT.load(Ordering::Relaxed) == 1 { &ZH } else { &EN }
+    match CURRENT.load(Ordering::Relaxed) {
+        1 => &ZH,
+        2 => &ZH_TW,
+        _ => &EN,
+    }
 }
 
 /// Replace `{key}` placeholders.
@@ -399,10 +535,33 @@ mod tests {
     }
 
     #[test]
+    fn system_locale_picks_traditional_or_simplified() {
+        use crate::settings::Language;
+        let traditional = ["zh-Hant", "zh-Hant-JP", "zh-TW", "zh_HK", "zh-MO", "ZH-hant-cn"];
+        for locale in traditional {
+            assert!(std::ptr::eq(resolve(Language::System, Some(locale)), &ZH_TW), "{locale}");
+        }
+        let simplified = ["zh", "zh-CN", "zh-Hans", "zh-SG", "zh-Hans-TW", "zh-Hans-HK"];
+        for locale in simplified {
+            assert!(std::ptr::eq(resolve(Language::System, Some(locale)), &ZH), "{locale}");
+        }
+    }
+
+    #[test]
+    fn traditional_chinese_can_be_chosen_explicitly() {
+        use crate::settings::Language;
+        assert!(std::ptr::eq(resolve(Language::ZhHant, Some("en-US")), &ZH_TW));
+        assert!(std::ptr::eq(resolve(Language::ZhHant, Some("zh-CN")), &ZH_TW));
+        assert_eq!(ZH_TW.reason_sep, "：");
+    }
+
+    #[test]
     fn set_language_switches_strings_and_reports_locale() {
         use crate::settings::Language;
         assert_eq!(set_language(Language::ZhHans, None), "zh-CN");
         assert_eq!(t().play, "播放");
+        assert_eq!(set_language(Language::ZhHant, None), "zh-TW");
+        assert_eq!(t().settings_title, "設定");
         assert_eq!(set_language(Language::English, None), "en");
         assert_eq!(t().play, "Play");
     }

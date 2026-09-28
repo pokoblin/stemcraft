@@ -137,6 +137,7 @@ fn language_key(language: Language) -> &'static str {
     match language {
         Language::System => "system",
         Language::ZhHans => "zh-hans",
+        Language::ZhHant => "zh-hant",
         Language::English => "english",
     }
 }
@@ -144,6 +145,7 @@ fn language_key(language: Language) -> &'static str {
 fn language_from(key: &str) -> Language {
     match key {
         "zh-hans" => Language::ZhHans,
+        "zh-hant" => Language::ZhHant,
         "english" => Language::English,
         _ => Language::System,
     }
@@ -178,6 +180,7 @@ fn general_page() -> SettingPage {
                     vec![
                         ("system".into(), s.follow_system.into()),
                         ("zh-hans".into(), "简体中文".into()),
+                        ("zh-hant".into(), "繁體中文".into()),
                         ("english".into(), "English".into()),
                     ],
                     |cx: &App| language_key(AppSettings::get(cx).language).into(),

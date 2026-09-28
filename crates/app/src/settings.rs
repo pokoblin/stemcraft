@@ -13,6 +13,8 @@ pub enum Language {
     #[default]
     System,
     ZhHans,
+    /// Traditional Chinese, Taiwan wording.
+    ZhHant,
     English,
 }
 
@@ -209,6 +211,12 @@ mod tests {
         assert_eq!(json, r#"{"kind":"folder","path":"/x"}"#);
         let json = serde_json::to_string(&ExportLocation::SameAsSong).unwrap();
         assert_eq!(json, r#"{"kind":"same-as-song"}"#);
+    }
+
+    #[test]
+    fn language_json_names() {
+        assert_eq!(serde_json::to_string(&Language::ZhHans).unwrap(), r#""zh-hans""#);
+        assert_eq!(serde_json::to_string(&Language::ZhHant).unwrap(), r#""zh-hant""#);
     }
 
     #[test]
