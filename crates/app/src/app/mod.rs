@@ -352,7 +352,7 @@ impl Render for AppView {
             Stage::Empty(_) => self.render_empty(cx).into_any_element(),
             Stage::Trim(_) => self.render_trim(window, cx).into_any_element(),
             Stage::Processing(_) => self.render_processing(cx).into_any_element(),
-            Stage::Mixer(_) => self.render_mixer(cx).into_any_element(),
+            Stage::Mixer(_) => self.render_mixer(window, cx).into_any_element(),
         };
         let theme = cx.theme();
         let (background, foreground) = (theme.background, theme.foreground);
