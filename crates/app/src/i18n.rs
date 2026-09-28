@@ -10,6 +10,8 @@ pub struct Strings {
     pub reading: &'static str,
     pub unsupported_file: &'static str,
     pub open_failed: &'static str,
+    /// Joins a notification's headline to its reason, e.g. `{open_failed}{reason_sep}{e}`.
+    pub reason_sep: &'static str,
     pub worker_stopped: &'static str,
     pub play: &'static str,
     pub pause: &'static str,
@@ -62,6 +64,7 @@ pub static EN: Strings = Strings {
     reading: "Reading the song…",
     unsupported_file: "That file type isn't supported. Choose a WAV, AIFF, FLAC, MP3, OGG, or M4A file.",
     open_failed: "Couldn't read this file",
+    reason_sep: ": ",
     worker_stopped: "The background task stopped unexpectedly",
     play: "Play",
     pause: "Pause",
@@ -109,8 +112,9 @@ pub static ZH: Strings = Strings {
     choose_file: "选择文件…",
     supported_formats: "支持 WAV、AIFF、FLAC、MP3、OGG、M4A",
     reading: "正在读取…",
-    unsupported_file: "不支持这种文件，请选择 WAV、AIFF、FLAC、MP3、OGG 或 M4A 文件。",
+    unsupported_file: "不支持这种文件。选择 WAV、AIFF、FLAC、MP3、OGG 或 M4A 文件。",
     open_failed: "无法读取这个文件",
+    reason_sep: "：",
     worker_stopped: "后台任务意外中止",
     play: "播放",
     pause: "暂停",
@@ -131,7 +135,7 @@ pub static ZH: Strings = Strings {
     retry: "重试",
     open_new: "打开新文件",
     confirm_discard_title: "打开新文件？",
-    confirm_discard_body: "当前的分离结果会被丢弃。如需保留，请先导出。",
+    confirm_discard_body: "当前的分离结果会被丢弃。如需保留，先导出。",
     confirm_open: "打开",
     cancel: "取消",
     chords_label: "和弦",
@@ -195,5 +199,11 @@ mod tests {
     #[test]
     fn falls_back_to_english_before_init() {
         assert_eq!(t().stems.len(), 6);
+    }
+
+    #[test]
+    fn chinese_reason_separator_is_full_width() {
+        assert_eq!(ZH.reason_sep, "：");
+        assert_eq!(EN.reason_sep, ": ");
     }
 }

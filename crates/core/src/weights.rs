@@ -20,16 +20,19 @@ fn bundled_path_for(exe: &Path) -> Option<PathBuf> {
     Some(exe.parent()?.parent()?.join("Resources").join(MODEL.filename))
 }
 
-/// Weights already on disk: the app bundle's copy first, then the download cache.
-fn find_local(exe: Option<&Path>, cache: &Path) -> Option<PathBuf> {
+/// Weights already on disk: the app bundle's copy first, then the download
+/// cache. `cache` is `None` when the cache directory couldn't be resolved at
+/// all — that must not stop the bundled copy from being found.
+fn find_local(exe: Option<&Path>, cache: Option<&Path>) -> Option<PathBuf> {
     exe.and_then(bundled_path_for)
         .filter(|p| p.is_file())
-        .or_else(|| cache.is_file().then(|| cache.to_path_buf()))
+        .or_else(|| cache.filter(|c| c.is_file()).map(Path::to_path_buf))
 }
 
 fn local_path() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok();
-    find_local(exe.as_deref(), &cache_path().ok()?)
+    let cache = cache_path().ok();
+    find_local(exe.as_deref(), cache.as_deref())
 }
 
 /// True when no download is needed (bundled or cached).
@@ -106,15 +109,20 @@ mod tests {
         let exe = macos.join("stemcraft-app");
         let cache = dir.path().join("cache.safetensors");
 
-        assert_eq!(find_local(Some(&exe), &cache), None);
+        assert_eq!(find_local(Some(&exe), Some(&cache)), None);
 
         std::fs::write(&cache, b"cached").unwrap();
-        assert_eq!(find_local(Some(&exe), &cache), Some(cache.clone()));
+        assert_eq!(find_local(Some(&exe), Some(&cache)), Some(cache.clone()));
 
         let bundled = resources.join(MODEL.filename);
         std::fs::write(&bundled, b"bundled").unwrap();
-        assert_eq!(find_local(Some(&exe), &cache), Some(bundled));
+        assert_eq!(find_local(Some(&exe), Some(&cache)), Some(bundled.clone()));
 
-        assert_eq!(find_local(None, &cache), Some(cache));
+        assert_eq!(find_local(None, Some(&cache)), Some(cache));
+
+        // No cache directory could be resolved at all (`cache_dir()` returned
+        // None): the bundled copy must still be found rather than bailing out.
+        assert_eq!(find_local(Some(&exe), None), Some(bundled));
+        assert_eq!(find_local(None, None), None);
     }
 }

@@ -37,9 +37,9 @@ pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([KeyBinding::new("space", TogglePlay, Some("Stemcraft && !Input"))]);
 }
 
-// `Trim` is much larger than `Empty`, and Task 10 adds sibling stages of
-// similar size (Processing, Mixer); boxing would just move the imbalance
-// around, so it's accepted here rather than restructured.
+// `Trim` is much larger than `Empty`, and the other stages (Processing,
+// Mixer) are of similar size; boxing would just move the imbalance around,
+// so it's accepted here rather than restructured.
 #[allow(clippy::large_enum_variant)]
 pub enum Stage {
     Empty(EmptyState),
@@ -193,7 +193,7 @@ impl AppView {
             Ok(decoded) => self.enter_trim(path, decoded, window, cx),
             Err(msg) => {
                 window.push_notification(
-                    Notification::error(format!("{}: {msg}", t().open_failed)),
+                    Notification::error(format!("{}{}{msg}", t().open_failed, t().reason_sep)),
                     cx,
                 );
                 cx.notify();
@@ -330,7 +330,7 @@ impl AppView {
         match self.player() {
             Some(Ok(player)) => player.toggle(),
             Some(Err(e)) => {
-                let message = format!("{}: {e}", t().no_audio_device);
+                let message = format!("{}{}{e}", t().no_audio_device, t().reason_sep);
                 window.push_notification(Notification::error(message), cx);
             }
             None => {}
@@ -415,9 +415,9 @@ impl AppView {
                 }
             }
         }
-        // `st`'s borrow of `self.stage` ends when the `if let` below executes and
-        // returns (at line 379), since `st` is not used after that return.
-        // This lets `enter_mixer` below take `&mut self` on this path.
+        // The `if let` below returns before using `st` again, so `st`'s borrow
+        // of `self.stage` has ended by the time `enter_mixer` runs, letting it
+        // take `&mut self` on this path.
         if let Some((path, song, result)) = done {
             self.enter_mixer(path, song, result, window, cx);
             return;
@@ -552,7 +552,7 @@ impl AppView {
         match finished {
             Ok(dir) => notify_export_done(dir, window, cx),
             Err(e) => window.push_notification(
-                Notification::error(format!("{}: {e}", t().export_failed)),
+                Notification::error(format!("{}{}{e}", t().export_failed, t().reason_sep)),
                 cx,
             ),
         }

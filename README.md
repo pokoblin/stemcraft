@@ -38,8 +38,10 @@ script/bundle-macos.sh                    # → dist/Stemcraft.app and dist/Stem
 ```
 
 The bundled app carries the model weights in `Contents/Resources/`, so it works offline with
-nothing else to install. It is ad-hoc signed: on another Mac, right-click → Open the first time
-(distributing to others needs a Developer ID signature and notarization).
+nothing else to install. It is ad-hoc signed, so on another Mac the first launch is blocked;
+open System Settings → Privacy & Security and click "Open Anyway" (on macOS versions before 15,
+right-click → Open also works). Distributing to others needs a Developer ID signature and
+notarization.
 
 ## Usage
 

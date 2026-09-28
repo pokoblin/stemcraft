@@ -1,5 +1,6 @@
 //! Export on a background thread: the mix, optional single stems, optional chord chart.
 
+use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use stemcraft_core::export::{self, ExportFormat};
 use stemcraft_core::mix::mixdown;
 
 use crate::naming::ExportPlan;
+use crate::worker::panic_message;
 
 pub struct ExportJob {
     pub plan: ExportPlan,
@@ -65,13 +67,17 @@ pub fn spawn(job: ExportJob) -> mpsc::Receiver<ExportMsg> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let total = job.total();
-        let result = run(&job, |done| {
-            let _ = tx.send(ExportMsg::Progress { done, total });
-        });
-        let _ = tx.send(match result {
-            Ok(()) => ExportMsg::Done(job.plan.dir.clone()),
-            Err(e) => ExportMsg::Failed(format!("{e:#}")),
-        });
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            run(&job, |done| {
+                let _ = tx.send(ExportMsg::Progress { done, total });
+            })
+        }));
+        let msg = match result {
+            Ok(Ok(())) => ExportMsg::Done(job.plan.dir.clone()),
+            Ok(Err(e)) => ExportMsg::Failed(format!("{e:#}")),
+            Err(payload) => ExportMsg::Failed(panic_message(payload)),
+        };
+        let _ = tx.send(msg);
     });
     rx
 }

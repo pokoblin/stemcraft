@@ -28,17 +28,6 @@ pub fn secs_to_frac(secs: f64, duration: f64) -> f32 {
     (secs / duration).clamp(0.0, 1.0) as f32
 }
 
-/// Parse the start / end fields (`SS`, `M:SS` or `H:MM:SS`) into a selection.
-pub fn parse_selection(start: &str, end: &str, duration: f64) -> Result<(f32, f32), SelectionError> {
-    let parse = |text: &str| parse_clock(text.trim()).map_err(|_| SelectionError::BadFormat);
-    let start = parse(start)?.min(duration);
-    let end = parse(end)?.min(duration);
-    if end - start < MIN_SELECTION_SECS {
-        return Err(SelectionError::TooShort);
-    }
-    Ok((secs_to_frac(start, duration), secs_to_frac(end, duration)))
-}
-
 pub fn check_selection(selection: (f32, f32), duration: f64) -> Result<(), SelectionError> {
     if (selection.1 - selection.0) as f64 * duration < MIN_SELECTION_SECS {
         Err(SelectionError::TooShort)
@@ -75,7 +64,7 @@ pub fn selection_to_range(selection: (f32, f32), duration: f64) -> TimeRange {
 ///
 /// The combined result is still checked against the minimum selection
 /// length, so an edit that makes the selection too short reports
-/// `TooShort` same as `parse_selection`.
+/// `TooShort`.
 pub fn edited_selection(
     start: &str,
     end: &str,
@@ -119,13 +108,18 @@ mod tests {
     }
 
     #[test]
-    fn parses_a_selection() {
-        assert_eq!(parse_selection("0:50", "1:40", 200.0), Ok((0.25, 0.5)));
+    fn edited_selection_parses_both_fields_when_last_written_never_matches() {
+        // A `last_written` that can't match either field's text forces both
+        // sides to be parsed fresh, covering the same cases the deleted
+        // `parse_selection` (a duplicate of this parsing path) used to.
+        const NEVER: (&str, &str) = ("\0", "\0");
+        let current = (0.0, 1.0);
+        assert_eq!(edited_selection("0:50", "1:40", NEVER, current, 200.0), Ok((0.25, 0.5)));
         // End past the song clamps to the end.
-        assert_eq!(parse_selection("0", "9:00", 200.0), Ok((0.0, 1.0)));
-        assert_eq!(parse_selection("abc", "1:00", 200.0), Err(SelectionError::BadFormat));
-        assert_eq!(parse_selection("1:00", "1:00.5", 200.0), Err(SelectionError::TooShort));
-        assert_eq!(parse_selection("2:00", "1:00", 200.0), Err(SelectionError::TooShort));
+        assert_eq!(edited_selection("0", "9:00", NEVER, current, 200.0), Ok((0.0, 1.0)));
+        assert_eq!(edited_selection("abc", "1:00", NEVER, current, 200.0), Err(SelectionError::BadFormat));
+        assert_eq!(edited_selection("1:00", "1:00.5", NEVER, current, 200.0), Err(SelectionError::TooShort));
+        assert_eq!(edited_selection("2:00", "1:00", NEVER, current, 200.0), Err(SelectionError::TooShort));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 //! Background threads for decoding and separation. Each reports over an mpsc
 //! channel that the UI drains on its tick.
 
+use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
@@ -25,15 +26,31 @@ pub struct Decoded {
     pub peaks: Arc<[(f32, f32)]>,
 }
 
+/// Turns a `catch_unwind` panic payload into a readable message: the common
+/// payload types (a `&str` or `String`, from `panic!("...")`) downcast
+/// directly, anything else falls back to a generic message.
+pub(crate) fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        s.to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "unknown panic".to_string()
+    }
+}
+
 pub fn spawn_decode(path: PathBuf) -> mpsc::Receiver<Result<Decoded, String>> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let result = audio::decode(&path)
-            .map(|audio| Decoded {
-                peaks: peaks(&audio, PEAK_BUCKETS).into(),
-                audio,
-            })
-            .map_err(|e| format!("{e:#}"));
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            audio::decode(&path)
+                .map(|audio| Decoded {
+                    peaks: peaks(&audio, PEAK_BUCKETS).into(),
+                    audio,
+                })
+                .map_err(|e| format!("{e:#}"))
+        }))
+        .unwrap_or_else(|payload| Err(panic_message(payload)));
         let _ = tx.send(result);
     });
     rx
@@ -77,9 +94,13 @@ pub fn spawn_separation(audio: Arc<StereoAudio>) -> mpsc::Receiver<SepMsg> {
     std::thread::Builder::new()
         .name("separation".into())
         .stack_size(SEPARATION_STACK)
-        .spawn(move || {
-            if let Err(e) = separate(&audio, &tx) {
+        .spawn(move || match panic::catch_unwind(AssertUnwindSafe(|| separate(&audio, &tx))) {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
                 let _ = tx.send(SepMsg::Failed(format!("{e:#}")));
+            }
+            Err(payload) => {
+                let _ = tx.send(SepMsg::Failed(panic_message(payload)));
             }
         })
         .expect("cannot spawn the separation thread");
@@ -176,5 +197,17 @@ mod tests {
             .recv_timeout(Duration::from_secs(10))
             .unwrap();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn panic_message_downcasts_known_payload_types() {
+        let str_payload: Box<dyn std::any::Any + Send> = Box::new("boom");
+        assert_eq!(panic_message(str_payload), "boom");
+
+        let string_payload: Box<dyn std::any::Any + Send> = Box::new(String::from("kaboom"));
+        assert_eq!(panic_message(string_payload), "kaboom");
+
+        let other_payload: Box<dyn std::any::Any + Send> = Box::new(42i32);
+        assert_eq!(panic_message(other_payload), "unknown panic");
     }
 }
