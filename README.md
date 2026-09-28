@@ -44,7 +44,7 @@ cargo build --release
 
 ```bash
 cargo run --release -p stemcraft-app      # run from source
-script/bundle-macos.sh                    # → dist/Stemcraft.app and dist/Stemcraft.dmg
+script/bundle-macos.sh                    # → dist/Stemcraft.app and dist/Stemcraft-<version>.dmg
 ```
 
 The bundled app carries the model weights in `Contents/Resources/`, so it works offline with

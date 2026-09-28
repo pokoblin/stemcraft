@@ -41,7 +41,7 @@ cargo build --release
 
 ```bash
 cargo run --release -p stemcraft-app      # 从源码运行
-script/bundle-macos.sh                    # → dist/Stemcraft.app 和 dist/Stemcraft.dmg
+script/bundle-macos.sh                    # → dist/Stemcraft.app 和 dist/Stemcraft-<version>.dmg
 ```
 
 打包好的应用把模型权重放在 `Contents/Resources/` 里，离线即可使用，不需要另外安装任何东西。

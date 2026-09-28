@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build dist/Stemcraft.app (model weights bundled, ad-hoc signed) and dist/Stemcraft.dmg.
+# Build dist/Stemcraft.app (model weights bundled, ad-hoc signed) and dist/Stemcraft-<version>.dmg.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -10,6 +10,7 @@ MODEL_FILE="htdemucs_6s.safetensors"
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
 DIST="dist"
 APP="$DIST/$APP_NAME.app"
+DMG="$DIST/$APP_NAME-$VERSION.dmg"
 
 echo "==> Building $BIN $VERSION (release)"
 cargo build --release -p stemcraft-app
@@ -53,7 +54,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
-  <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string></array>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string><string>zh-Hant</string></array>
   <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -66,14 +67,14 @@ echo "==> Signing (ad-hoc)"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
-echo "==> Creating $DIST/$APP_NAME.dmg"
+echo "==> Creating $DMG"
 STAGING="$DIST/dmg-staging"
-rm -rf "$STAGING" "$DIST/$APP_NAME.dmg"
+rm -rf "$STAGING" "$DMG"
 mkdir -p "$STAGING"
 cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DIST/$APP_NAME.dmg" >/dev/null
+hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGING"
 
 echo "Done:"
-du -sh "$APP" "$DIST/$APP_NAME.dmg"
+du -sh "$APP" "$DMG"
