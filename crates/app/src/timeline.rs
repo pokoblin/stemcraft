@@ -54,6 +54,27 @@ pub fn selection_to_range(selection: (f32, f32), duration: f64) -> TimeRange {
     }
 }
 
+/// Decide whether the trim page's time fields have actually been edited by
+/// the user since the app last wrote into them, and if so, parse them.
+///
+/// `last_written` is the `(start, end)` text the app itself most recently
+/// put into the inputs (e.g. after a waveform drag, or after a previous
+/// successful parse). Returns `None` when both fields still match that text
+/// (nothing to apply — the caller should leave the selection and any error
+/// state untouched), or `Some(parse_selection(start, end, duration))` when
+/// either field differs from what was last written.
+pub fn edited_selection(
+    start: &str,
+    end: &str,
+    last_written: (&str, &str),
+    duration: f64,
+) -> Option<Result<(f32, f32), SelectionError>> {
+    if start == last_written.0 && end == last_written.1 {
+        return None;
+    }
+    Some(parse_selection(start, end, duration))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +117,40 @@ mod tests {
         let r = selection_to_range((0.25, 0.5), 200.0);
         assert_eq!(r.start, 50.0);
         assert_eq!(r.end, Some(100.0));
+    }
+
+    #[test]
+    fn edited_selection_is_none_when_text_matches_last_written() {
+        assert_eq!(edited_selection("0:00", "3:20", ("0:00", "3:20"), 200.7), None);
+    }
+
+    #[test]
+    fn edited_selection_parses_when_text_changed() {
+        assert_eq!(
+            edited_selection("0:50", "1:40", ("0:00", "3:20"), 200.0),
+            Some(Ok((0.25, 0.5)))
+        );
+    }
+
+    #[test]
+    fn edited_selection_reports_bad_format_when_changed_text_is_invalid() {
+        assert_eq!(
+            edited_selection("nope", "1:40", ("0:00", "3:20"), 200.0),
+            Some(Err(SelectionError::BadFormat))
+        );
+    }
+
+    #[test]
+    fn edited_selection_triggers_on_either_field_alone() {
+        // Only the start field changed.
+        assert_eq!(
+            edited_selection("0:10", "3:20", ("0:00", "3:20"), 200.0),
+            Some(parse_selection("0:10", "3:20", 200.0))
+        );
+        // Only the end field changed.
+        assert_eq!(
+            edited_selection("0:00", "3:00", ("0:00", "3:20"), 200.0),
+            Some(parse_selection("0:00", "3:00", 200.0))
+        );
     }
 }
