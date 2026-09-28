@@ -6,6 +6,7 @@ pub mod export_job;
 pub mod i18n;
 pub mod naming;
 pub mod player;
+pub mod settings;
 pub mod timeline;
 pub mod views;
 pub mod waveform;

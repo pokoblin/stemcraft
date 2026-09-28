@@ -9331,7 +9331,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cpal",
+ "dirs 7.0.0",
  "gpui-kit",
+ "serde",
+ "serde_json",
  "stemcraft-core",
  "sys-locale",
  "tempfile",
