@@ -5,6 +5,7 @@ pub mod app_state;
 pub mod controls;
 pub mod export_job;
 pub mod i18n;
+pub mod licenses;
 pub mod naming;
 pub mod player;
 pub mod settings;
