@@ -274,24 +274,27 @@ impl AppView {
         cx.notify();
     }
 
-    /// Apply the trim page's time fields to the selection, but only if the
-    /// user actually edited them since the app last wrote into them — see
-    /// `TrimState::last_written`. A no-op Blur/Enter (or a button click that
-    /// blurs nothing) must never re-parse and truncate an untouched
-    /// selection to whole seconds.
+    /// Apply the trim page's time fields to the selection, parsing only
+    /// whichever field(s) the user actually edited since the app last wrote
+    /// into them — see `TrimState::last_written`. A no-op Blur/Enter (or a
+    /// button click that blurs nothing) must never re-parse and truncate an
+    /// untouched field to whole seconds, and reverting a bad edit back to
+    /// the remembered text must clear the error rather than leave it stuck
+    /// forever (the fields being unchanged means the current selection is
+    /// already valid, by construction).
     fn apply_time_inputs(&mut self, cx: &mut Context<Self>) {
         let Stage::Trim(st) = &mut self.stage else { return };
         let start = st.start_input.read(cx).value().to_string();
         let end = st.end_input.read(cx).value().to_string();
         let last_written = (st.last_written.0.as_str(), st.last_written.1.as_str());
-        match timeline::edited_selection(&start, &end, last_written, st.duration()) {
-            None => {}
-            Some(Ok(selection)) => {
+        let duration = st.duration();
+        match timeline::edited_selection(&start, &end, last_written, st.selection, duration) {
+            Ok(selection) => {
                 st.selection = selection;
                 st.input_error = None;
                 st.last_written = (start, end);
             }
-            Some(Err(e)) => st.input_error = Some(selection_message(e).into()),
+            Err(e) => st.input_error = Some(selection_message(e).into()),
         }
         cx.notify();
     }

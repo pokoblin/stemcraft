@@ -54,25 +54,47 @@ pub fn selection_to_range(selection: (f32, f32), duration: f64) -> TimeRange {
     }
 }
 
-/// Decide whether the trim page's time fields have actually been edited by
-/// the user since the app last wrote into them, and if so, parse them.
+/// Apply the trim page's time fields to a selection, parsing only the
+/// field(s) the user actually edited since the app last wrote into the
+/// inputs.
 ///
 /// `last_written` is the `(start, end)` text the app itself most recently
 /// put into the inputs (e.g. after a waveform drag, or after a previous
-/// successful parse). Returns `None` when both fields still match that text
-/// (nothing to apply — the caller should leave the selection and any error
-/// state untouched), or `Some(parse_selection(start, end, duration))` when
-/// either field differs from what was last written.
+/// successful apply). `current` is the selection as it stands right now
+/// (exact fractions, not rounded to whole seconds like the display text).
+///
+/// A field whose text still equals its `last_written` text is untouched, so
+/// its side of `current` is kept exactly rather than re-parsed from the
+/// (whole-second) display text — parsing it would needlessly truncate a
+/// fractional selection. Only a field whose text differs is parsed; a bad
+/// format there is reported as `BadFormat` even if the other field is fine.
+/// When both fields are untouched (including a field that was edited and
+/// then reverted back to the remembered text), this returns `Ok(current)`
+/// unchanged — callers should treat that as clearing any stale error, since
+/// the current selection is by definition valid already.
+///
+/// The combined result is still checked against the minimum selection
+/// length, so an edit that makes the selection too short reports
+/// `TooShort` same as `parse_selection`.
 pub fn edited_selection(
     start: &str,
     end: &str,
     last_written: (&str, &str),
+    current: (f32, f32),
     duration: f64,
-) -> Option<Result<(f32, f32), SelectionError>> {
-    if start == last_written.0 && end == last_written.1 {
-        return None;
+) -> Result<(f32, f32), SelectionError> {
+    let start_changed = start != last_written.0;
+    let end_changed = end != last_written.1;
+    if !start_changed && !end_changed {
+        return Ok(current);
     }
-    Some(parse_selection(start, end, duration))
+    let parse = |text: &str| parse_clock(text.trim()).map_err(|_| SelectionError::BadFormat);
+    let start_secs = if start_changed { parse(start)? } else { frac_to_secs(current.0, duration) }.min(duration);
+    let end_secs = if end_changed { parse(end)? } else { frac_to_secs(current.1, duration) }.min(duration);
+    if end_secs - start_secs < MIN_SELECTION_SECS {
+        return Err(SelectionError::TooShort);
+    }
+    Ok((secs_to_frac(start_secs, duration), secs_to_frac(end_secs, duration)))
 }
 
 #[cfg(test)]
@@ -120,37 +142,67 @@ mod tests {
     }
 
     #[test]
-    fn edited_selection_is_none_when_text_matches_last_written() {
-        assert_eq!(edited_selection("0:00", "3:20", ("0:00", "3:20"), 200.7), None);
-    }
-
-    #[test]
-    fn edited_selection_parses_when_text_changed() {
+    fn edited_selection_keeps_current_exactly_when_both_fields_unchanged() {
+        // 200.7s song: the current selection holds an exact fraction that
+        // whole-second display text ("0:00" / "3:20") cannot represent.
         assert_eq!(
-            edited_selection("0:50", "1:40", ("0:00", "3:20"), 200.0),
-            Some(Ok((0.25, 0.5)))
+            edited_selection("0:00", "3:20", ("0:00", "3:20"), (0.3, 1.0), 200.7),
+            Ok((0.3, 1.0))
         );
     }
 
     #[test]
-    fn edited_selection_reports_bad_format_when_changed_text_is_invalid() {
+    fn edited_selection_clears_to_current_when_a_bad_edit_is_reverted() {
+        // The user typed something invalid earlier (which set input_error),
+        // then retyped the exact text the app last wrote. From this
+        // function's point of view that's indistinguishable from "never
+        // touched it" — Ok(current) tells the caller to clear the error.
         assert_eq!(
-            edited_selection("nope", "1:40", ("0:00", "3:20"), 200.0),
-            Some(Err(SelectionError::BadFormat))
+            edited_selection("0:00", "3:20", ("0:00", "3:20"), (0.0, 1.0), 200.7),
+            Ok((0.0, 1.0))
         );
     }
 
     #[test]
-    fn edited_selection_triggers_on_either_field_alone() {
-        // Only the start field changed.
+    fn edited_selection_parses_only_the_changed_start_field() {
+        let duration = 200.7;
+        let current = (0.3, 1.0);
+        // End text ("3:20") matches last_written, so its exact current
+        // fraction is kept rather than reparsed from truncated display text.
+        let expected_end = current.1;
+        let expected_start = secs_to_frac(10.0, duration);
         assert_eq!(
-            edited_selection("0:10", "3:20", ("0:00", "3:20"), 200.0),
-            Some(parse_selection("0:10", "3:20", 200.0))
+            edited_selection("0:10", "3:20", ("0:00", "3:20"), current, duration),
+            Ok((expected_start, expected_end))
         );
-        // Only the end field changed.
+    }
+
+    #[test]
+    fn edited_selection_parses_only_the_changed_end_field() {
+        let duration = 200.7;
+        let current = (0.3, 1.0);
+        let expected_start = current.0;
+        let expected_end = secs_to_frac(100.0, duration);
         assert_eq!(
-            edited_selection("0:00", "3:00", ("0:00", "3:20"), 200.0),
-            Some(parse_selection("0:00", "3:00", 200.0))
+            edited_selection("0:00", "1:40", ("0:00", "3:20"), current, duration),
+            Ok((expected_start, expected_end))
+        );
+    }
+
+    #[test]
+    fn edited_selection_reports_bad_format_for_changed_invalid_text() {
+        assert_eq!(
+            edited_selection("nope", "3:20", ("0:00", "3:20"), (0.0, 1.0), 200.0),
+            Err(SelectionError::BadFormat)
+        );
+    }
+
+    #[test]
+    fn edited_selection_reports_too_short_when_an_edit_shrinks_it() {
+        // Start is untouched at 0s; the end is edited down to 0.5s.
+        assert_eq!(
+            edited_selection("0:00", "0:00.5", ("0:00", "3:20"), (0.0, 1.0), 200.0),
+            Err(SelectionError::TooShort)
         );
     }
 }
