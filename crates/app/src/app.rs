@@ -578,11 +578,11 @@ impl AppView {
                         .show_cancel(true),
                 )
                 .on_ok(move |_, window, cx| {
-                    view.update(cx, |this, cx| {
-                        this.back_to_empty(cx);
-                        this.open_file_dialog(window, cx);
-                    })
-                    .ok();
+                    // Don't discard the stems until a file is actually chosen —
+                    // `load_file` replaces the stage once one is (or reports an
+                    // unsupported type and leaves the mixer); cancelling the
+                    // picker must leave the current stems in place.
+                    view.update(cx, |this, cx| this.open_file_dialog(window, cx)).ok();
                     true
                 })
                 .on_cancel(|_, _, _| true)
