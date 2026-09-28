@@ -10,15 +10,18 @@ use std::time::Duration;
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::Notification;
 use gpui_kit::component::slider::SliderState;
-use gpui_kit::component::{ActiveTheme as _, Root, Theme, WindowExt as _};
+use gpui_kit::component::{ActiveTheme as _, Root, WindowExt as _};
 use gpui_kit::*;
 use stemcraft_core::audio::StereoAudio;
 use stemcraft_core::chords::Chord;
 
+use crate::app_state::AppSettings;
 use crate::controls::MixControls;
 use crate::i18n::t;
 use crate::naming;
 use crate::player::Player;
+use crate::settings::Appearance;
+use crate::style;
 use crate::timeline::SelectionError;
 use crate::worker::{self, Decoded, SepMsg, Step};
 
@@ -121,7 +124,9 @@ pub struct AppView {
     pub export: Option<ExportProgress>,
     was_playing: bool,
     _tick: Task<()>,
-    _appearance: Subscription,
+    _subscriptions: Vec<Subscription>,
+    settings_changed: bool,
+    active_device: Option<String>,
 }
 
 fn selection_message(error: SelectionError) -> &'static str {
@@ -135,9 +140,19 @@ impl AppView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
-        let appearance = cx.observe_window_appearance(window, |_, window, cx| {
-            Theme::sync_system_appearance(Some(window), cx);
-        });
+        let subscriptions = vec![
+            // Handled on the next tick, which has a window for notifications.
+            cx.observe_global::<AppSettings>(|this, cx| {
+                this.settings_changed = true;
+                cx.notify();
+            }),
+            cx.observe_window_appearance(window, |_, _, cx| {
+                if AppSettings::get(cx).appearance == Appearance::System {
+                    style::apply_appearance(cx);
+                }
+            }),
+        ];
+        let active_device = AppSettings::get(cx).output_device_id().map(str::to_string);
         let tick = cx.spawn_in(window, async move |this, cx| loop {
             cx.background_executor().timer(Duration::from_millis(33)).await;
             if this.update_in(cx, |this, window, cx| this.on_tick(window, cx)).is_err() {
@@ -150,7 +165,9 @@ impl AppView {
             export: None,
             was_playing: false,
             _tick: tick,
-            _appearance: appearance,
+            _subscriptions: subscriptions,
+            settings_changed: false,
+            active_device,
         }
     }
 
@@ -163,6 +180,9 @@ impl AppView {
     }
 
     fn on_tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if std::mem::take(&mut self.settings_changed) {
+            self.apply_settings(window, cx);
+        }
         let playing = matches!(self.player(), Some(Ok(p)) if p.is_playing());
         // Keep redrawing while playing, plus one frame after it stops.
         if playing || self.was_playing {
@@ -252,6 +272,68 @@ impl AppView {
             None => {}
         }
         self.focus.focus(window, cx);
+        cx.notify();
+    }
+
+    fn apply_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Read first: global_mut would notify observers again.
+        if cx.global::<AppSettings>().save_error.is_some()
+            && let Some(error) = cx.global_mut::<AppSettings>().save_error.take()
+        {
+            let message = format!("{}{}{error}", t().settings_save_failed, t().reason_sep);
+            window.push_notification(Notification::error(message), cx);
+        }
+        let device = AppSettings::get(cx).output_device_id().map(str::to_string);
+        if device != self.active_device {
+            self.active_device = device;
+            self.rebuild_player(window, cx);
+        }
+    }
+
+    /// Open a player on the output device chosen in the settings, telling the
+    /// user when it had to fall back to the system default.
+    pub(super) fn open_player(
+        &self,
+        tracks: Arc<Vec<StereoAudio>>,
+        controls: Arc<MixControls>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<Player, String> {
+        let device = AppSettings::get(cx).output_device_id().map(str::to_string);
+        let player = Player::new(tracks, controls, device.as_deref()).map_err(|e| format!("{e:#}"));
+        if matches!(&player, Ok(p) if p.fell_back()) {
+            window.push_notification(Notification::warning(t().device_fallback), cx);
+        }
+        player
+    }
+
+    /// Reopen the current player on the newly chosen device, keeping the
+    /// position and play state.
+    fn rebuild_player(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (old, tracks, controls) = match &self.stage {
+            Stage::Trim(st) => (&st.player, st.source.clone(), Arc::new(MixControls::new(1))),
+            Stage::Mixer(st) => (&st.player, st.stems.clone(), st.controls.clone()),
+            _ => return,
+        };
+        let (position, playing) = old
+            .as_ref()
+            .map(|p| (p.position_frac(), p.is_playing()))
+            .unwrap_or((0.0, false));
+        if let Ok(old) = old {
+            old.pause();
+        }
+        let player = self.open_player(tracks, controls, window, cx);
+        if let Ok(p) = &player {
+            p.seek_frac(position);
+            if playing {
+                p.toggle();
+            }
+        }
+        match &mut self.stage {
+            Stage::Trim(st) => st.player = player,
+            Stage::Mixer(st) => st.player = player,
+            _ => {}
+        }
         cx.notify();
     }
 }

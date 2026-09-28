@@ -11,7 +11,6 @@ use gpui_kit::*;
 
 use crate::controls::MixControls;
 use crate::naming;
-use crate::player::Player;
 use crate::timeline;
 use crate::worker::Decoded;
 
@@ -38,8 +37,7 @@ impl AppView {
             })
             .collect();
         let source = Arc::new(vec![decoded.audio]);
-        let player = Player::new(source.clone(), Arc::new(MixControls::new(1)), None)
-            .map_err(|e| format!("{e:#}"));
+        let player = self.open_player(source.clone(), Arc::new(MixControls::new(1)), window, cx);
         self.stage = Stage::Trim(TrimState {
             song: naming::song_name(&path),
             path,

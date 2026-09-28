@@ -4,6 +4,8 @@ pub mod empty;
 pub mod export_dialog;
 pub mod mixer;
 pub mod processing;
+pub mod settings_window;
+pub mod toolbar;
 pub mod trim;
 pub mod waveform_view;
 

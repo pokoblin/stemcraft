@@ -11,7 +11,6 @@ use stemcraft_core::separation::Separator;
 
 use crate::controls::MixControls;
 use crate::i18n::t;
-use crate::player::Player;
 use crate::worker::{self, SepMsg, Separated, Step};
 
 use super::{AppView, MixerState, ProcessingState, Stage};
@@ -102,7 +101,7 @@ impl AppView {
             }));
             sliders.push(slider);
         }
-        let player = Player::new(stems.clone(), controls.clone(), None).map_err(|e| format!("{e:#}"));
+        let player = self.open_player(stems.clone(), controls.clone(), window, cx);
         self.stage = Stage::Mixer(MixerState {
             path,
             song,

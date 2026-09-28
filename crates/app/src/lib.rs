@@ -1,56 +1,67 @@
 //! Stemcraft desktop app: split a song into six stems, audition a mix, export it.
 
 pub mod app;
+pub mod app_state;
 pub mod controls;
 pub mod export_job;
 pub mod i18n;
 pub mod naming;
 pub mod player;
 pub mod settings;
+pub mod style;
 pub mod timeline;
 pub mod views;
 pub mod waveform;
+pub mod windows;
 pub mod worker;
 
-use gpui_kit::component::{Root, Theme};
 use gpui_kit::*;
 
-actions!(stemcraft, [Quit]);
+use crate::app_state::AppSettings;
+
+actions!(stemcraft, [Quit, OpenSettings]);
 
 pub fn run() {
-    i18n::set_language(settings::Language::System, sys_locale::get_locale().as_deref());
     gpui_kit::application()
-        // Icons (checkbox tick, notification close, …) need the asset bundle.
-        .with_assets(gpui_kit::assets::Assets)
+        .with_assets(style::AppAssets)
         .run(|cx| {
             gpui_kit::init(cx);
+            app_state::init(cx);
+            style::install_themes(cx);
+            style::apply_appearance(cx);
             app::bind_keys(cx);
+            cx.bind_keys([
+                KeyBinding::new("cmd-q", Quit, None),
+                KeyBinding::new("cmd-,", OpenSettings, None),
+            ]);
             cx.on_action(|_: &Quit, cx| cx.quit());
-            cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
-            cx.set_menus(vec![Menu {
-                name: "Stemcraft".into(),
-                items: vec![MenuItem::action(i18n::t().quit, Quit)],
-                disabled: false,
-            }]);
-
-            let options = WindowOptions {
-                titlebar: Some(TitlebarOptions {
-                    title: Some("Stemcraft".into()),
-                    ..Default::default()
-                }),
-                window_bounds: Some(WindowBounds::centered(size(px(1100.), px(720.)), cx)),
-                window_min_size: Some(size(px(900.), px(600.))),
-                ..Default::default()
-            };
-            cx.open_window(options, |window, cx| {
-                // gpui-kit defaults to the light theme; follow the system instead.
-                Theme::sync_system_appearance(Some(window), cx);
-                let view = cx.new(|cx| app::AppView::new(window, cx));
-                // Dialogs and notifications require a Root as the window's first view.
-                cx.new(|cx| Root::new(view, window, cx))
-            })
-            .expect("cannot open the main window");
-            cx.on_window_closed(|cx, _| cx.quit()).detach();
+            cx.on_action(|_: &OpenSettings, cx| windows::open_settings(cx));
+            // After bind_keys, so the menu shows the shortcuts.
+            apply_language(cx);
+            windows::open_main(cx);
             cx.activate(true);
         });
+}
+
+/// Apply the language setting everywhere: our strings, gpui-kit's built-in
+/// strings and the menu bar.
+pub fn apply_language(cx: &mut App) {
+    let language = AppSettings::get(cx).language;
+    let locale = i18n::set_language(language, sys_locale::get_locale().as_deref());
+    gpui_kit::component::set_locale(locale);
+    cx.set_menus(menus());
+    cx.refresh_windows();
+}
+
+fn menus() -> Vec<Menu> {
+    let s = i18n::t();
+    vec![Menu {
+        name: "Stemcraft".into(),
+        items: vec![
+            MenuItem::action(s.settings_menu, OpenSettings),
+            MenuItem::separator(),
+            MenuItem::action(s.quit, Quit),
+        ],
+        disabled: false,
+    }]
 }
