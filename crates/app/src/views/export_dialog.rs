@@ -1,11 +1,12 @@
-//! ⑤ Export options. Lives in its own entity because the dialog builder
-//! closure re-runs every frame and must not own state.
+//! ⑤ Export options, grouped: format, contents, destination. Lives in its own
+//! entity because the dialog builder closure re-runs every frame.
 
 use std::path::PathBuf;
 
+use gpui_kit::assets::IconName as Lucide;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::{h_flex, v_flex, ActiveTheme as _, Selectable as _, Sizable as _};
+use gpui_kit::component::{h_flex, v_flex, ActiveTheme as _, Icon, Selectable as _, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use stemcraft_core::export::ExportFormat;
@@ -29,15 +30,10 @@ pub struct ExportDialog {
 }
 
 impl ExportDialog {
-    /// `audible[i]`: whether stem `i` is heard right now (pre-ticks it).
-    pub fn new(dest: PathBuf, audible: Vec<bool>) -> Self {
-        Self {
-            format: ExportFormat::Flac,
-            include_stems: false,
-            stems: audible,
-            chords: false,
-            dest,
-        }
+    /// `audible[i]`: whether stem `i` is heard right now (pre-ticks it). The
+    /// other values come from the settings.
+    pub fn new(dest: PathBuf, audible: Vec<bool>, format: ExportFormat, include_stems: bool, chords: bool) -> Self {
+        Self { format, include_stems, stems: audible, chords, dest }
     }
 
     pub fn request(&self) -> ExportRequest {
@@ -77,8 +73,12 @@ impl ExportDialog {
 impl Render for ExportDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let s = t();
-        let muted_fg = cx.theme().muted_foreground;
-        let label = |text: &'static str| div().text_sm().text_color(muted_fg).child(text);
+        let theme = cx.theme();
+        let (muted_fg, border, muted, success) =
+            (theme.muted_foreground, theme.border, theme.muted, theme.success);
+        let heading = move |text: &'static str| {
+            div().text_xs().font_weight(FontWeight::MEDIUM).text_color(muted_fg).child(text)
+        };
 
         let formats = h_flex().gap_1().children(ExportFormat::ALL.iter().map(|&format| {
             Button::new(format.extension())
@@ -101,10 +101,15 @@ impl Render for ExportDialog {
                 }))
         }));
 
-        v_flex()
-            .gap_4()
-            .child(v_flex().gap_2().child(label(s.format_label)).child(formats))
-            .child(h_flex().gap_2().child("✓").child(s.mix_label))
+        let contents = v_flex()
+            .gap_2()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(Icon::new(Lucide::Check).size(px(14.)).text_color(success))
+                    .child(s.mix_label),
+            )
             .child(
                 Checkbox::new("export-also-stems")
                     .label(s.also_stems)
@@ -123,51 +128,60 @@ impl Render for ExportDialog {
                         this.chords = *checked;
                         cx.notify();
                     })),
-            )
+            );
+
+        let destination = h_flex()
+            .gap_2()
+            .items_center()
+            .p_2()
+            .rounded_md()
+            .border_1()
+            .border_color(border)
+            .bg(muted)
+            .child(Icon::new(Lucide::FolderOpen).size(px(14.)).text_color(muted_fg))
+            .child(div().flex_1().min_w_0().text_sm().truncate().child(self.dest.display().to_string()))
             .child(
-                v_flex().gap_2().child(label(s.save_to)).child(
-                    h_flex()
-                        .gap_2()
-                        .items_center()
-                        .child(div().flex_1().text_sm().truncate().child(self.dest.display().to_string()))
-                        .child(
-                            Button::new("export-change-folder")
-                                .small()
-                                .outline()
-                                .label(s.change_folder)
-                                .on_click(cx.listener(|this, _, window, cx| this.choose_folder(window, cx))),
-                        ),
-                ),
-            )
+                Button::new("export-change-folder")
+                    .small()
+                    .outline()
+                    .label(s.change_folder)
+                    .on_click(cx.listener(|this, _, window, cx| this.choose_folder(window, cx))),
+            );
+
+        v_flex()
+            .gap_5()
+            .child(v_flex().gap_2().child(heading(s.format_label)).child(formats))
+            .child(v_flex().gap_2().child(heading(s.export_contents)).child(contents))
+            .child(v_flex().gap_2().child(heading(s.save_to)).child(destination))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    // Only the names needed: a glob import of gpui here hits the recursion limit.
     use super::{ExportDialog, ExportFormat, PathBuf};
 
-    #[test]
-    fn pre_ticks_stems_to_what_is_audible() {
-        let dialog = ExportDialog::new(PathBuf::from("/tmp"), vec![true, false, true]);
-        assert_eq!(dialog.stems, vec![true, false, true]);
+    fn dialog(include_stems: bool) -> ExportDialog {
+        ExportDialog::new(
+            PathBuf::from("/music"),
+            vec![true, false, true, false, false, true],
+            ExportFormat::Mp3,
+            include_stems,
+            true,
+        )
     }
 
     #[test]
-    fn request_omits_stems_unless_also_stems_is_checked() {
-        let mut dialog = ExportDialog::new(PathBuf::from("/tmp"), vec![true, false, true]);
-        assert_eq!(dialog.request().stems, Vec::<usize>::new());
-        dialog.include_stems = true;
-        assert_eq!(dialog.request().stems, vec![0, 2]);
+    fn request_carries_settings_defaults() {
+        let r = dialog(false).request();
+        assert_eq!(r.format, ExportFormat::Mp3);
+        assert!(r.chords);
+        assert_eq!(r.dest, PathBuf::from("/music"));
     }
 
     #[test]
-    fn request_carries_format_chords_and_dest() {
-        let mut dialog = ExportDialog::new(PathBuf::from("/music"), vec![true]);
-        dialog.format = ExportFormat::Mp3;
-        dialog.chords = true;
-        let request = dialog.request();
-        assert_eq!(request.format, ExportFormat::Mp3);
-        assert!(request.chords);
-        assert_eq!(request.dest, PathBuf::from("/music"));
+    fn stems_only_when_enabled_and_pre_ticked_by_audibility() {
+        assert!(dialog(false).request().stems.is_empty());
+        assert_eq!(dialog(true).request().stems, vec![0, 2, 5]);
     }
 }

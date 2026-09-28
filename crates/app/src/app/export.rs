@@ -11,6 +11,7 @@ use gpui_kit::component::{Sizable as _, WindowExt as _};
 use gpui_kit::*;
 use stemcraft_core::mix;
 
+use crate::app_state::AppSettings;
 use crate::export_job::{self, ExportJob, ExportMsg};
 use crate::i18n::t;
 use crate::naming;
@@ -27,10 +28,20 @@ pub struct ExportProgress {
 
 impl AppView {
     pub fn open_export_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.export.is_some() {
+            window.push_notification(Notification::info(t().export_busy), cx);
+            return;
+        }
         let Stage::Mixer(st) = &self.stage else { return };
         let audible = mix::gains(&st.controls.snapshot()).iter().map(|g| *g > 0.0).collect();
-        let dest = st.path.parent().map(PathBuf::from).unwrap_or_default();
-        let options = cx.new(|_| ExportDialog::new(dest, audible));
+        let settings = AppSettings::get(cx).clone();
+        let target = settings.export_dir(&st.path);
+        if target.fell_back {
+            window.push_notification(Notification::warning(t().export_dir_fallback), cx);
+        }
+        let options = cx.new(|_| {
+            ExportDialog::new(target.dir, audible, settings.format(), settings.export_stems, settings.export_chords)
+        });
         let view = cx.entity().downgrade();
         window.open_dialog(cx, move |dialog, _, _| {
             let s = t();
